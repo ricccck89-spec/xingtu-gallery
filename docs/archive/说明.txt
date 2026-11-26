@@ -1,0 +1,16 @@
+实况转换脚本（在 Claude 的 Linux 沙箱里跑，不是在你这台 Windows 上跑）
+
+为什么：要把实况 mp4 转成 iPhone 能认的实况照片，需要三样东西——ffmpeg、pillow-heif（编 HEIC）、
+exiftool 13 以上（写 Apple MakerNote 和 quicktime content identifier）。这台机器的内置 Python 里没有这些，
+所以转换这一步是 Claude 在沙箱里做的。
+
+用法（Claude 用）：
+    python3 lp.py <输出目录> <起始编号> <源 mp4> [...]
+    python3 lp.py /…/Volume/LivePhotos 137 /…/某文件夹/*.mp4
+
+产出：每组 IMG_XXXX.HEIC + IMG_XXXX.MOV，两边写入同一个 UUID，MOV 一律 ≤ 3.00 秒。
+（这是第一批用的老脚本，还按 IMG_XXXX 编号；现在界面里的「实况照片」按原视频文件名输出，不用这个脚本了。）
+
+脚本里两个硬编码路径（/tmp/et/r2/… 的 exiftool）是沙箱里的，换环境要改；装法：
+    pip install --break-system-packages pillow-heif
+    apt-get download libimage-exiftool-perl && dpkg -x *.deb root   （要 13.x 才有 ContentIdentifier）

@@ -1,0 +1,51 @@
+# === 敏感配置与本地密钥 ===
+.env
+.env.*
+*.key
+*.pem
+DouK-Lite/config.json
+Volume/settings.json
+
+# === 用户媒体数据与上游数据库 ===
+Volume/
+
+# === 上游 DouK-Downloader 运行库与二进制 ===
+/*.dll
+/*.exe
+/frozen_application_license.txt
+/locale/
+/share/
+/static/
+
+# === 嵌入式 Python 与第三方工具二进制 ===
+DouK-Lite/python/
+DouK-Lite/tools/*
+!DouK-Lite/tools/README.txt
+
+# === 缓存、日志、构建标识与临时文件 ===
+logs/
+DouK-Lite/logs/
+DouK-Lite/cache/
+DouK-Lite/server.build
+*.log
+*.part
+*.tmp
+*.db
+*.sqlite
+*.lnk
+
+# === Python 虚拟环境与字节码 ===
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# === IDE 与系统文件 ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
