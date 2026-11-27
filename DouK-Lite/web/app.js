@@ -516,6 +516,9 @@ function renderManifest() {
     } else if (it.exists) {
       st.dataset.state = "skip";
       st.textContent = "已存在";
+    } else if (it.download_state === "partial") {
+      st.dataset.state = "partial";
+      st.textContent = "部分下载";
     } else {
       st.textContent = "";
     }
@@ -557,7 +560,10 @@ function setRowState(id, status, message, file) {
   state.jobItems[id] = { id, status, message, file };
   if (status === "done" || status === "skip") {
     const item = state.items.find((x) => x.id === id);
-    if (item) item.exists = true;
+    if (item) {
+      item.exists = true;
+      item.download_state = "all";
+    }
   }
   const row = $("manifest").querySelector(`.row[data-id="${CSS.escape(id)}"]`);
   if (!row) return;
@@ -1520,6 +1526,24 @@ function syncViewerFramesActive() {
   });
 }
 
+function updateViewerDeleteButtons() {
+  const v = state.viewer;
+  const f = v.files[v.index];
+  const delOne = $("viewerDeleteOne");
+  const delAll = $("viewerDelete");
+  if (!delOne || !delAll) return;
+  const multi = v.files.length > 1 && !!f;
+  delOne.hidden = !multi;
+  if (multi) {
+    delOne.textContent = f.is_frame ? "删这张截图" : (f.kind === "video" ? "删当前视频" : "删这一张");
+    delAll.textContent = `删整条 (${v.files.length})`;
+    delAll.title = `把这条作品的全部 ${v.files.length} 个文件移到回收站`;
+  } else {
+    delAll.textContent = "移到回收站";
+    delAll.title = "把这条作品的文件移到回收站";
+  }
+}
+
 function appendViewerFrame(r) {
   const v = state.viewer;
   if (!r || !r.path) return;
@@ -1533,6 +1557,7 @@ function appendViewerFrame(r) {
   $("viewerPrev").hidden = v.files.length < 2;
   $("viewerNext").hidden = v.files.length < 2;
   renderViewerFrames();
+  updateViewerDeleteButtons();
 }
 
 function clearViewerStage() {
@@ -1561,6 +1586,7 @@ function showViewerFile() {
   $("viewerPrev").hidden = v.files.length < 2;
   $("viewerNext").hidden = v.files.length < 2;
   syncViewerFramesActive();
+  updateViewerDeleteButtons();
   if (!f) return;
 
   const src = "/api/asset?path=" + encodeURIComponent(f.path);
@@ -1622,6 +1648,51 @@ $("viewerNext").addEventListener("click", () => {
 $("viewerOpen").addEventListener("click", () => {
   const f = state.viewer.files[state.viewer.index];
   if (f) openFolder(folderOf(f.path));
+});
+
+$("viewerDeleteOne").addEventListener("click", async () => {
+  const v = state.viewer;
+  const f = v.files[v.index];
+  if (!f) return;
+  const label = f.name ? `「${f.name}」` : "当前文件";
+  if (!window.confirm(`把${label}移到回收站？`)) return;
+  const btn = $("viewerDeleteOne");
+  btn.disabled = true;
+  try {
+    const r = await api("/api/post/delete", { paths: [f.path] });
+    if (!r.ok) {
+      showToast(r.message || "删除失败");
+      return;
+    }
+    v.files.splice(v.index, 1);
+    if (v.post) {
+      if (f.is_frame && Array.isArray(v.post.frames)) {
+        v.post.frames = v.post.frames.filter((x) => x.path !== f.path);
+      } else if (Array.isArray(v.post.files)) {
+        v.post.files = v.post.files.filter((x) => x.path !== f.path);
+        v.post.count = v.post.files.length;
+        if (v.post.cover === f.path) {
+          const nextImg = v.post.files.find((x) => x.kind !== "video") || v.post.files[0];
+          v.post.cover = nextImg ? nextImg.path : "";
+        }
+      }
+    }
+    showToast(`已将${label}移到回收站`);
+    state.gallery.dirty = true;
+    if (state.view === "gallery") loadGallery(true);
+    if (state.view === "creator" && state.lib.key) refreshLibrary(true);
+    if (!v.files.length) {
+      $("viewer").close();
+      return;
+    }
+    if (v.index >= v.files.length) v.index = v.files.length - 1;
+    renderViewerFrames();
+    showViewerFile();
+  } catch (e) {
+    showToast("删除失败：" + e.message);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 $("viewerDelete").addEventListener("click", async () => {
@@ -3787,22 +3858,30 @@ function renderDiscoverUserGrid() {
     grid.innerHTML = "";
     return;
   }
-  grid.innerHTML = items.map((it, idx) => `
+  grid.innerHTML = items.map((it, idx) => {
+    const isPartial = !it.exists && it.download_state === "partial";
+    const badgeHtml = it.exists
+      ? '<span class="discover-exists-badge">已下载</span>'
+      : (isPartial ? '<span class="discover-exists-badge is-partial">部分下载</span>' : "");
+    const btnCls = it.exists ? " is-exists" : (isPartial ? " is-partial" : "");
+    const btnText = it.exists ? "已下载" : (isPartial ? "部分下载" : "下载");
+    return `
     <article class="discover-card">
       <div class="discover-cover-wrap" data-du-open="${idx}">
         <img class="discover-cover" src="${escapeHtml(proxyImg(it.cover))}" loading="lazy" alt="">
-        ${it.exists ? '<span class="discover-exists-badge">已下载</span>' : ""}
+        ${badgeHtml}
         <span class="discover-badge">${escapeHtml(it.type || "图文")}</span>
       </div>
       <div class="discover-body">
         <h3 class="discover-title" data-du-open="${idx}">${escapeHtml(it.title || it.desc || "无标题")}</h3>
         <div class="discover-actions">
           <button class="mini" data-du-open="${idx}" type="button">预览</button>
-          <button class="mini${it.exists ? " is-exists" : ""}" data-du-dl="${idx}" type="button">${it.exists ? "已下载" : "下载"}</button>
+          <button class="mini${btnCls}" data-du-dl="${idx}" type="button">${btnText}</button>
         </div>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 
 async function loadDiscoverUserPage(reset) {
@@ -3849,7 +3928,11 @@ async function loadDiscoverUserPage(reset) {
     }
     discoverBrowse.cursor = r.cursor || "";
     const existsCount = discoverBrowse.items.filter((x) => x.exists).length;
-    $("discoverUserMeta").textContent = `已加载 ${discoverBrowse.items.length} 篇作品${existsCount ? `（本地已下载 ${existsCount} 篇）` : ""}（点击封面可直接预览）`;
+    const partialCount = discoverBrowse.items.filter((x) => !x.exists && x.download_state === "partial").length;
+    const statusParts = [];
+    if (existsCount) statusParts.push(`已下载 ${existsCount} 篇`);
+    if (partialCount) statusParts.push(`部分下载 ${partialCount} 篇`);
+    $("discoverUserMeta").textContent = `已加载 ${discoverBrowse.items.length} 篇作品${statusParts.length ? `（本地${statusParts.join("，")}）` : ""}（点击封面可直接预览）`;
     $("discoverUserHint").hidden = discoverBrowse.items.length > 0;
     if (!discoverBrowse.items.length) {
       $("discoverUserHint").textContent = r.message || "暂无可显示的作品";
@@ -4025,10 +4108,12 @@ async function downloadSingleFromDiscover(item) {
         const itState = (job.items || {})[item.id] || {};
         if (itState.status === "done") {
           item.exists = true;
+          item.download_state = "all";
           renderDiscoverUserGrid();
           showToast("下载完成，已收录到画廊");
         } else if (itState.status === "skip") {
           item.exists = true;
+          item.download_state = "all";
           renderDiscoverUserGrid();
           showToast("本地已存在该作品");
         } else if (itState.status === "error") {

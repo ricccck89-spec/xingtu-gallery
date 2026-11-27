@@ -350,7 +350,10 @@ class Handler(BaseHTTPRequestHandler):
             cfg = config.load_config()
             root = Path(cfg.get("root") or config.VOLUME_DIR)
             raw_items = state.get_parse_items(jid)
-            items = [{**it, "exists": downloader.item_exists(root, it, cfg)} for it in raw_items]
+            items = []
+            for it in raw_items:
+                dl_state = downloader.item_download_status(root, it, cfg)
+                items.append({**it, "exists": dl_state == "all", "download_state": dl_state})
             return self._json({
                 "ok": True,
                 "kind": job.get("target_kind"),
@@ -788,6 +791,8 @@ class Handler(BaseHTTPRequestHandler):
                         parts = p.relative_to(active_root).parts
                         if len(parts) >= 2:
                             affected_folders.add(parts[0])
+                            if parts[0] == config.FRAME_DIR and len(parts) >= 3:
+                                affected_folders.add(parts[1])
                         else:
                             affected_folders = None
                             break
@@ -1184,11 +1189,10 @@ def _mark_discover_exists(payload, sec_uid=""):
     for it in items:
         if not isinstance(it, dict):
             continue
-        if it.get("downloads"):
-            it["exists"] = downloader.item_exists(root, it, cfg)
-        else:
-            cit = cached_by_id.get(it.get("id"))
-            it["exists"] = bool(cit and downloader.item_exists(root, cit, cfg))
+        target_it = it if it.get("downloads") else cached_by_id.get(it.get("id"))
+        dl_state = downloader.item_download_status(root, target_it, cfg) if target_it else "none"
+        it["download_state"] = dl_state
+        it["exists"] = dl_state == "all"
     return payload
 
 

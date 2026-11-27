@@ -104,10 +104,10 @@ def _candidate_folders(root, item, template):
     return folders
 
 
-def _find_by_ts_prefix(folder, ts_key, live_folder, video_folder):
-    """按精确到秒的发布时间前缀匹配已下载文件，兼容博主改名、文案变化或实况文件数差异。"""
+def _iter_by_ts_prefix(folder, ts_key, live_folder, video_folder):
+    """遍历按精确到秒的发布时间前缀匹配的已下载文件。"""
     if not ts_key or not folder.exists():
-        return None
+        return
     dirs = (
         folder,
         config.sub_folder(folder, live_folder, "实况"),
@@ -129,43 +129,66 @@ def _find_by_ts_prefix(folder, ts_key, live_folder, video_folder):
                         continue
                     try:
                         if entry.is_file() and entry.stat().st_size > 0:
-                            return Path(entry.path)
+                            yield Path(entry.path)
                     except OSError:
                         pass
         except OSError:
             pass
-    return None
 
 
-def item_exists(root, item, cfg=None):
-    """判断一条已解析作品是否已完整存在于当前保存目录中。"""
+def _find_by_ts_prefix(folder, ts_key, live_folder, video_folder):
+    """按精确到秒的发布时间前缀匹配已下载文件，兼容博主改名、文案变化或实况文件数差异。"""
+    return next(_iter_by_ts_prefix(folder, ts_key, live_folder, video_folder), None)
+
+
+def _count_by_ts_prefix(folder, ts_key, live_folder, video_folder):
+    """统计按精确到秒的发布时间前缀匹配到的已下载文件数。"""
+    return sum(1 for _ in _iter_by_ts_prefix(folder, ts_key, live_folder, video_folder))
+
+
+def item_download_status(root, item, cfg=None):
+    """判断一条已解析作品在当前保存目录中的下载状态：'all' | 'partial' | 'none'。"""
     cfg = cfg or config.load_config()
     urls = item.get("downloads") or []
     if not urls:
-        return False
+        return "none"
     live_folder = cfg.get("live_folder") or "实况"
     video_folder = cfg.get("video_folder") or "视频"
     template = cfg.get("folder_template") or ""
     folders = _candidate_folders(root, item, template)
     base = item_base_stem(item)
-    multi = len(urls) > 1
+    total = len(urls)
+    multi = total > 1
+    best_hits = 0
     for folder in folders:
         if not folder.exists():
             continue
-        all_exact = True
-        for idx in range(1, len(urls) + 1):
+        hits = 0
+        for idx in range(1, total + 1):
             stem = f"{base}_{idx}" if multi else base
-            if not find_existing_any(folder, stem, live_folder, video_folder):
-                all_exact = False
-                break
-        if all_exact:
-            return True
+            if find_existing_any(folder, stem, live_folder, video_folder):
+                hits += 1
+        if hits >= total:
+            return "all"
+        if hits > best_hits:
+            best_hits = hits
+    if best_hits > 0:
+        return "partial"
+
     ts_key = _ts_key(item.get("create_time"))
     if ts_key:
         for folder in folders:
-            if _find_by_ts_prefix(folder, ts_key, live_folder, video_folder):
-                return True
-    return False
+            matched_count = _count_by_ts_prefix(folder, ts_key, live_folder, video_folder)
+            if matched_count > 0:
+                if total > 1 and item.get("type") != "实况" and matched_count < total:
+                    return "partial"
+                return "all"
+    return "none"
+
+
+def item_exists(root, item, cfg=None):
+    """判断一条已解析作品是否已完整存在于当前保存目录中。"""
+    return item_download_status(root, item, cfg) == "all"
 
 
 def _stem_variants(stem):

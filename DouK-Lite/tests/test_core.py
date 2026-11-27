@@ -147,6 +147,22 @@ def main():
     assert downloader.item_exists(td2, it_vid) is True
     assert downloader.item_exists(td2, it_img) is True
     assert downloader.item_exists(td2, it_miss) is False
+    assert downloader.item_download_status(td2, it_vid) == "all"
+    assert downloader.item_download_status(td2, it_img) == "all"
+    assert downloader.item_download_status(td2, it_miss) == "none"
+
+    it_partial = {
+        "id": "w4", "type": "图集", "desc": "部分图", "create_time": "2026-11-18 11:30:00",
+        "nickname": "测试作者", "uid": "1", "sec_uid": "S1", "downloads": ["http://x/1", "http://x/2", "http://x/3"],
+    }
+    (creator_dir / "2026-11-18 11_30_00-图集-测试作者-部分图_1.jpg").write_bytes(b"\xff\xd8\xff\xe0" + b"0" * 32)
+    assert downloader.item_download_status(td2, it_partial) == "partial"
+    assert downloader.item_exists(td2, it_partial) is False
+    marked = http_server._mark_discover_exists({"ok": True, "items": [it_vid, it_partial, it_miss]})
+    by_marked = {x["id"]: x for x in marked["items"]}
+    assert by_marked["w1"]["download_state"] == "all" and by_marked["w1"]["exists"] is True
+    assert by_marked["w4"]["download_state"] == "partial" and by_marked["w4"]["exists"] is False
+    assert by_marked["w3"]["download_state"] == "none" and by_marked["w3"]["exists"] is False
 
     # 9. _jobs 快照隔离 + /api/works/items 返回 exists + scan_frame_videos limit 排序截断
     jid = "test_job_1"
@@ -155,7 +171,7 @@ def main():
     snap = state.get_job_snapshot(jid)
     snap["items"]["a"]["status"] = "mutated"
     assert state.get_job_snapshot(jid)["items"]["a"]["status"] == "pending"
-    state.remember_parse(jid, [it_vid, it_miss])
+    state.remember_parse(jid, [it_vid, it_partial, it_miss])
 
     httpd2 = http_server.QuietThreadingHTTPServer(("127.0.0.1", 0), http_server.Handler)
     port2 = httpd2.server_address[1]
@@ -164,7 +180,9 @@ def main():
         with urllib.request.urlopen(f"http://127.0.0.1:{port2}/api/works/items?id={jid}", timeout=5) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
             by_id = {x["id"]: x for x in payload["items"]}
-            assert by_id["w1"]["exists"] is True and by_id["w3"]["exists"] is False
+            assert by_id["w1"]["exists"] is True and by_id["w1"]["download_state"] == "all"
+            assert by_id["w4"]["exists"] is False and by_id["w4"]["download_state"] == "partial"
+            assert by_id["w3"]["exists"] is False and by_id["w3"]["download_state"] == "none"
     finally:
         httpd2.shutdown()
         httpd2.server_close()

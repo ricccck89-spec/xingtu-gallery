@@ -1175,6 +1175,7 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 
 .row .state[data-state="done"] { color: var(--ok); }
 .row .state[data-state="skip"] { color: var(--skip); }
+.row .state[data-state="partial"] { color: var(--copper); }
 .row .state[data-state="error"] { color: var(--bad); }
 .row .state[data-state="downloading"] { color: var(--copper); }
 
@@ -2682,9 +2683,20 @@ body.fx-zoom #fxVideo {
   color: #e9fff3;
 }
 
+.discover-exists-badge.is-partial {
+  background: rgba(168, 102, 24, 0.9);
+  border-color: rgba(245, 179, 88, 0.6);
+  color: #fff4e0;
+}
+
 .mini.is-exists {
   color: #8ce9b5;
   border-color: rgba(90, 220, 150, 0.45);
+}
+
+.mini.is-partial {
+  color: #f6c478;
+  border-color: rgba(245, 179, 88, 0.5);
 }
 
 .discover-body {
