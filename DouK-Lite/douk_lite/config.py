@@ -248,9 +248,17 @@ def live_out_dir(root):
 
 
 def tool_path(name, exe):
-    p = TOOLS_DIR / exe
-    if p.exists():
-        return str(p)
+    candidates = [TOOLS_DIR / exe]
+    if os.name != "nt":
+        candidates.extend([
+            TOOLS_DIR / name,
+            Path("/opt/homebrew/bin") / name,
+            Path("/usr/local/bin") / name,
+            Path.home() / ".local" / "bin" / name,
+        ])
+    for p in candidates:
+        if p.exists():
+            return str(p)
     return shutil.which(name) or ""
 
 

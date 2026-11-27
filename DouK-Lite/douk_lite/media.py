@@ -722,16 +722,36 @@ def run_live_job(job_id, files, root):
     state.prune_jobs()
 
 
+def _move_to_mac_trash(src: Path) -> bool:
+    trash = Path.home() / ".Trash"
+    if not trash.is_dir():
+        return False
+    dest = trash / src.name
+    if dest.exists():
+        stem, suffix = src.stem, src.suffix
+        idx = 1
+        while (trash / f"{stem}_{idx}{suffix}").exists():
+            idx += 1
+        dest = trash / f"{stem}_{idx}{suffix}"
+    shutil.move(str(src), str(dest))
+    return True
+
+
 def recycle_files(paths):
-    """把文件移到系统回收站（Windows 用 SHFileOperationW，支持撤销）。"""
+    """把文件移到系统回收站/废纸篓（Windows 用 SHFileOperationW，macOS 移至 ~/.Trash）。"""
     if not paths:
         return 0
     if os.name != "nt":
+        import sys
         cnt = 0
         for p in paths:
+            fp = Path(p)
             try:
-                Path(p).unlink()
-                cnt += 1
+                if sys.platform == "darwin" and fp.exists() and _move_to_mac_trash(fp):
+                    cnt += 1
+                else:
+                    fp.unlink()
+                    cnt += 1
             except OSError:
                 pass
         return cnt

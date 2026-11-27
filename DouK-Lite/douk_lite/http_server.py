@@ -861,7 +861,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"ok": False, "message": "没有需要转换的实况视频"})
                 tools = config.tool_status()
                 if not tools["ffmpeg"] or not tools["exiftool"]:
-                    return self._json({"ok": False, "message": "缺少转换工具：tools 目录里应有 ffmpeg.exe 和 exiftool.exe"})
+                    msg = (
+                        "缺少转换工具：请先安装 ffmpeg 和 exiftool（如 brew install ffmpeg exiftool）"
+                        if sys.platform == "darwin"
+                        else "缺少转换工具：tools 目录里应有 ffmpeg.exe 和 exiftool.exe"
+                    )
+                    return self._json({"ok": False, "message": msg})
                 jid = uuid.uuid4().hex
                 job = {
                     "id": jid, "kind": "livephoto", "total": len(todo), "finished": 0,
@@ -1086,9 +1091,27 @@ def livephoto_scan_payload(root):
 
 
 def pick_folder(initial=""):
-    """弹 Windows 的文件夹选择框，返回选中的路径。"""
+    """弹系统文件夹选择框（支持 Windows 与 macOS），返回选中的路径。"""
+    if sys.platform == "darwin":
+        prompt = 'choose folder with prompt "选择下载保存目录"'
+        if initial and os.path.isdir(initial):
+            escaped = initial.replace("\\", "\\\\").replace('"', '\\"')
+            prompt += f' default location POSIX file "{escaped}"'
+        script = f"POSIX path of ({prompt})"
+        try:
+            r = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True, text=True, timeout=600,
+                encoding="utf-8", errors="replace",
+            )
+        except Exception as exc:
+            return {"ok": False, "message": f"打开选择框失败：{exc}"}
+        out = (r.stdout or "").strip().rstrip("/")
+        if r.returncode != 0 or not out:
+            return {"ok": False, "message": "没有选择文件夹"}
+        return {"ok": True, "path": out}
     if os.name != "nt":
-        return {"ok": False, "message": "只有 Windows 下能弹选择框"}
+        return {"ok": False, "message": "当前系统暂不支持弹出文件夹选择框"}
     ps = (
         "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;"
         "Add-Type -AssemblyName System.Windows.Forms;"
@@ -1131,6 +1154,8 @@ def open_folder(target):
     try:
         if os.name == "nt":
             os.startfile(str(p))
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(p)])
         else:
             subprocess.Popen(["xdg-open", str(p)])
         return {"ok": True, "path": str(p)}

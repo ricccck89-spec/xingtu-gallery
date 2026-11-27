@@ -4,7 +4,7 @@
 
 ## 这是什么
 
-**星图画廊**是一套纯本地运行的 Windows 桌面 Web 应用（内核为 `DouK-Lite`），定位是「**本地博主作品库 + 一站式素材工具台**」。双击根目录下的 `DouK-Lite\星图画廊.vbs`（或 `DouK-Lite\scripts\启动.cmd`）即可在独立 Chrome 应用窗口中打开，关闭窗口后后台服务自动退出。
+**星图画廊**是一套纯本地运行的桌面 Web 应用（内核为 `DouK-Lite`，支持 Windows 与 macOS），定位是「**本地博主作品库 + 一站式素材工具台**」。Windows 双击根目录下的 `DouK-Lite\星图画廊.vbs`（或 `DouK-Lite\scripts\启动.cmd`），macOS 双击 `DouK-Lite/星图画廊.command`（或运行 `bash DouK-Lite/scripts/start_mac.sh`）即可在独立 Chrome 应用窗口中打开，关闭窗口后后台服务自动退出。
 
 核心能力分为三大模块：
 
@@ -36,7 +36,11 @@
   - `media.py`：缩略图缓存、视频抽帧/截帧落盘、实况照片转码封装与回收站清理。
   - `config.py` / `state.py`：配置管理、UTF-8 轮转日志与任务状态。
 - **前端（`DouK-Lite/web/`）**：`index.html` / `style.css` / `app.js` 原生三件套，无外部构建依赖。
-- **内置运行环境**：免安装 Python 3.12 embeddable（`python\`）与离线媒体工具（`tools\ffmpeg.exe`、`tools\exiftool.exe`）。
+- **内置运行环境（Windows）**：免安装 Python 3.12 embeddable（`python\`）与离线媒体工具（`tools\ffmpeg.exe`、`tools\exiftool.exe`）。
+- **macOS 环境运行**：
+  - 需要 Python 3.10+（推荐 3.12）、`ffmpeg` 与 `exiftool`（如 `brew install python@3.12 ffmpeg exiftool`）。
+  - 安装依赖：`pip install -r DouK-Lite/requirements.txt`（已通过环境标记自动跳过 `WMI` / `pywin32` 等 Windows 专用包）。
+  - 启动与停止：运行 `bash DouK-Lite/scripts/start_mac.sh`（或双击 `DouK-Lite/星图画廊.command`）启动；运行 `bash DouK-Lite/scripts/stop_mac.sh` 停止后台服务。
 
 ---
 

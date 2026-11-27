@@ -30,7 +30,8 @@ def main():
     assert config.validate_root("")[0] is None
     assert config.validate_root(str(config.APP_DIR))[0] is None
     assert config.validate_root(str(config.WEB_DIR))[0] is None
-    assert config.validate_root(r"E:\Files\pics")[0] == r"E:\Files\pics"
+    sample_root = r"E:\Files\pics" if sys.platform == "win32" else str(Path(tempfile.gettempdir()) / "pics")
+    assert config.validate_root(sample_root)[0] == sample_root
 
     # 3. scan_live 跳过 截帧 与 LivePhotos
     td = Path(tempfile.mkdtemp(prefix="douk_core_test_"))

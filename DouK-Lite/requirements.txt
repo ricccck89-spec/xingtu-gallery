@@ -1,0 +1,9 @@
+# Cross-platform core dependencies (requires Python >= 3.10)
+f2 @ git+https://github.com/Johnserf-Seed/f2.git@f6be8c0ffba9a127075bbeafe4838716650b6325
+xhshow==0.2.0
+pillow>=11.0.0
+pillow_heif>=1.8.0
+
+# Windows-only dependencies
+WMI==1.5.1 ; sys_platform == "win32"
+pywin32==312 ; sys_platform == "win32"
