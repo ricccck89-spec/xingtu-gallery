@@ -46,9 +46,6 @@
         <span>工具</span>
         <span class="nav-count" id="navLiveCount" hidden>0</span>
       </button>
-      <button class="nav-item" data-view="frame" type="button">
-        <span>截帧</span>
-      </button>
     </nav>
 
     <div class="rail-block">
@@ -80,7 +77,7 @@
         <p class="eyebrow">MEDIA LIBRARY</p>
         <h1>你的博主，<br>收进一座画廊</h1>
         <p class="sub">下载过的博主和作品都在这里。点开一位博主看她的全部作品，或者直接在下面按时间浏览所有人的图片和视频。</p>
-        <p class="keys">粘贴解析和下载在「下载」 · 实况转换在「工具」 · 逐帧截取在「截帧」</p>
+        <p class="keys">粘贴解析和下载在「发现」 · 实况转换与逐帧截取都在「工具」</p>
       </section>
 
       <section class="gal-stats" id="galStats" aria-label="画廊统计">
@@ -363,19 +360,23 @@
 
     <!-- ============ 工具 ============ -->
     <section class="view" id="viewTools" hidden>
-      <section class="intro">
+      <section class="intro tools-head">
         <p class="eyebrow">TOOLS</p>
         <h1>工具，<br>把素材变成成品</h1>
-        <p class="sub">把抖音的实况视频转成 iPhone 能认的实况照片，配对信息全部在本地写，不联网。逐帧截取在左边的「截帧」页。</p>
-        <p class="keys">成品会放进保存目录里的 LivePhotos 文件夹</p>
+        <p class="sub">本地处理已下载的素材：实况照片封装、视频逐帧截取，后续还会陆续增加更多实用工具。</p>
+        <div class="modes tools-tabs" id="toolsTabs" role="tablist" aria-label="工具列表">
+          <button class="mode is-on" data-tool="live" role="tab" aria-selected="true" type="button">实况照片</button>
+          <button class="mode" data-tool="frame" role="tab" aria-selected="false" type="button">视频截帧</button>
+        </div>
       </section>
 
       <!-- 实况照片 -->
-      <section class="tool-panel" id="toolLive">
+      <section class="tool-panel" id="toolLive" data-tool-panel="live">
         <div class="result-head live-head">
           <div class="result-id">
             <h2 id="liveTitle">实况照片</h2>
             <p class="meta" id="liveMeta">正在扫描保存目录…</p>
+            <p class="keys">配对信息全部在本地写，成品放进保存目录里的 LivePhotos 文件夹</p>
           </div>
           <div class="actions">
             <button class="ghost" id="liveRescan" type="button">重新扫描</button>
@@ -393,29 +394,25 @@
         <button class="ghost lib-more" id="liveMore" type="button" hidden>加载更多</button>
       </section>
 
-      <!-- 视频抽帧搬到了独立的「截帧」页 -->
-    </section>
-
-    <!-- ============ 截帧 ============ -->
-    <section class="view" id="viewFrame" hidden>
-      <div class="fx-bar">
-        <div class="fx-id">
-          <p class="eyebrow">FRAME CAPTURE</p>
-          <h1>截帧，<br>停在哪一帧存哪一帧</h1>
-          <p class="fx-note" id="fxMeta">正在扫描视频…</p>
-          <p class="fx-keys">
-            <kbd>空格</kbd> 播放 · <kbd>←</kbd> <kbd>→</kbd> 逐帧 ·
-            <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> / <kbd>J</kbd> <kbd>L</kbd> 一秒 ·
-            <kbd>Home</kbd> <kbd>End</kbd> 首尾 · <kbd>S</kbd> 存图 · <kbd>C</kbd> 复制
-          </p>
+      <!-- 视频截帧 -->
+      <section class="tool-panel" id="toolFrame" data-tool-panel="frame" hidden>
+        <div class="fx-bar">
+          <div class="fx-id">
+            <h2>视频截帧</h2>
+            <p class="fx-note" id="fxMeta">正在扫描视频…</p>
+            <p class="fx-keys">
+              <kbd>空格</kbd> 播放 · <kbd>←</kbd> <kbd>→</kbd> 逐帧 ·
+              <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> / <kbd>J</kbd> <kbd>L</kbd> 一秒 ·
+              <kbd>Home</kbd> <kbd>End</kbd> 首尾 · <kbd>S</kbd> 存图 · <kbd>C</kbd> 复制
+            </p>
+          </div>
+          <div class="fx-bar-actions">
+            <button class="ghost" id="fxRescan" type="button">重新扫描</button>
+            <button class="ghost" id="fxOpenOut" type="button">打开截帧文件夹</button>
+          </div>
         </div>
-        <div class="fx-bar-actions">
-          <button class="ghost" id="fxRescan" type="button">重新扫描</button>
-          <button class="ghost" id="fxOpenOut" type="button">打开截帧文件夹</button>
-        </div>
-      </div>
 
-      <div class="fx-layout">
+        <div class="fx-layout">
         <aside class="fx-side">
           <div class="fx-side-head">
             <input id="fxSearch" class="search" type="search" autocomplete="off"
@@ -497,6 +494,7 @@
           <div class="fx-saved" id="fxSaved" hidden></div>
         </div>
       </div>
+      </section>
     </section>
   </main>
 </div>
@@ -640,7 +638,7 @@
       <span class="vf-keys">← → 逐帧 · Shift+← → 一秒 · [ ] 换文件 · S 存图 · C 复制</span>
 
       <div class="vf-actions">
-        <button class="ghost" id="vfDeck" type="button" title="到截帧页里继续逐帧看">在截帧页打开</button>
+        <button class="ghost" id="vfDeck" type="button" title="到工具页的「视频截帧」里继续逐帧看">在截帧工具打开</button>
         <button class="ghost" id="vfCopy" type="button" title="把这一帧复制到剪贴板 (C)">复制图片</button>
         <button class="primary" id="vfSave" type="button" title="保存这一帧为 PNG (S)">保存 PNG</button>
       </div>

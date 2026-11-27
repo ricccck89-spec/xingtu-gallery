@@ -1927,6 +1927,10 @@ main { max-width: 1180px; }
 
 /* ---------- 工具 ---------- */
 
+.tools-tabs {
+  margin-top: 18px;
+}
+
 .tool-panel { margin-top: 26px; }
 
 .tool-panel .live-head {
@@ -1935,11 +1939,16 @@ main { max-width: 1180px; }
   border-top: 0;
 }
 
-/* ---------- 截帧：独立工作台 ---------- */
+.tool-panel .live-head .keys {
+  margin: 6px 0 0;
+}
+
+/* ---------- 截帧：集成在工具页内的工作台 ---------- */
 
 body.frame-mode main { max-width: 1380px; }
+body.frame-mode #viewTools { max-width: none; }
 
-#viewFrame {
+#toolFrame {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1954,15 +1963,14 @@ body.frame-mode main { max-width: 1380px; }
   flex-wrap: wrap;
 }
 
-.fx-id { max-width: 660px; }
-.fx-id .eyebrow { margin-bottom: 8px; }
+.fx-id { max-width: 680px; }
 
-.fx-id h1 {
+.fx-id h2 {
   margin: 0;
-  font-size: clamp(24px, 2.6vw, 32px);
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1.18;
-  letter-spacing: -0.012em;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .fx-note {

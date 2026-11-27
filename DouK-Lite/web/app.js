@@ -64,6 +64,7 @@ const state = {
   viewer: { files: [], index: 0, title: "", video: null, creator: "" },
   live: { items: [], tools: null, id: null, running: false, poll: null, shown: 300, lastResp: null },
   frame: { items: [], selected: null, kind: "all", q: "", scanToken: 0, loaded: false, busy: false, out: "" },
+  tool: "live",
 };
 
 const PLACEHOLDER = {
@@ -1881,9 +1882,64 @@ function showLiveHint(msg, isError) {
   el.className = isError ? "hint is-error" : "hint";
 }
 
+// 工具页子功能注册表：后续新增工具只需在这里登记并补一段 DOM 面板
+const TOOLS = {
+  live: {
+    panelId: "toolLive",
+    onEnter: () => scanLive(),
+  },
+  frame: {
+    panelId: "toolFrame",
+    wide: true,
+    onEnter: () => fxScan(false),
+    onLeave: () => {
+      const v = $("fxVideo");
+      if (v && !v.paused) v.pause();
+      FX.stripToken += 1; // 停掉还在跑的胶片条生成
+    },
+  },
+};
+
+function isFrameActive() {
+  return state.view === "tools" && state.tool === "frame";
+}
+
+function syncToolsUI() {
+  const active = TOOLS[state.tool] ? state.tool : "live";
+  state.tool = active;
+  document.querySelectorAll("#toolsTabs [data-tool]").forEach((btn) => {
+    const on = btn.dataset.tool === active;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  for (const [key, cfg] of Object.entries(TOOLS)) {
+    const panel = $(cfg.panelId);
+    if (panel) panel.hidden = key !== active;
+  }
+  document.body.classList.toggle("frame-mode", state.view === "tools" && !!TOOLS[active].wide);
+}
+
+function setTool(tool) {
+  const next = TOOLS[tool] ? tool : "live";
+  const prev = state.tool;
+  if (prev !== next && TOOLS[prev]?.onLeave) {
+    TOOLS[prev].onLeave();
+  }
+  state.tool = next;
+  syncToolsUI();
+  if (state.view === "tools" && TOOLS[next]?.onEnter) {
+    TOOLS[next].onEnter();
+  }
+}
+
 function setView(view) {
   const openDownloadPanel = view === "download";
   if (openDownloadPanel) view = "discover";
+  if (view === "frame") {
+    view = "tools";
+    state.tool = "frame";
+  }
+  const prevView = state.view;
   state.view = view;
   const navKey = view === "creator" ? "gallery" : view;
   document.querySelectorAll(".nav-item").forEach((b) => {
@@ -1894,27 +1950,28 @@ function setView(view) {
   $("viewDiscover").hidden = view !== "discover";
   if (openDownloadPanel) $("viewDownload").hidden = false;
   $("viewTools").hidden = view !== "tools";
-  $("viewFrame").hidden = view !== "frame";
-  document.body.classList.toggle("frame-mode", view === "frame");
 
   if (view === "discover" && !state.discover.loaded && !state.discover.loading) {
     loadXhsHomefeed(true);
   }
 
-  if (view !== "frame") {
-    const v = $("fxVideo");
-    if (v && !v.paused) v.pause();
-    FX.stripToken += 1; // 停掉还在跑的胶片条生成
+  if (prevView === "tools" && view !== "tools" && TOOLS[state.tool]?.onLeave) {
+    TOOLS[state.tool].onLeave();
   }
+  syncToolsUI();
 
   if (view === "gallery") {
     if (!state.gallery.loaded || state.gallery.dirty) loadGallery(false);
   } else if (view === "tools") {
-    scanLive();
-  } else if (view === "frame") {
-    fxScan(false);
+    TOOLS[state.tool]?.onEnter?.();
   }
 }
+
+$("toolsTabs")?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-tool]");
+  if (!btn) return;
+  setTool(btn.dataset.tool);
+});
 
 async function scanLive() {
   const token = ++liveScanToken;
@@ -2893,9 +2950,9 @@ function fxInit() {
 
 fxInit();
 
-// 键盘快捷键：只在截帧页、且没有弹窗时接管
+// 键盘快捷键：只在截帧工具、且没有弹窗时接管
 window.addEventListener("keydown", (e) => {
-  if (state.view !== "frame") return;
+  if (!isFrameActive()) return;
   // 查看器 / 设置这类弹窗开着时，把按键还回去
   if (document.querySelector("dialog[open]")) return;
   const tag = (e.target.tagName || "").toLowerCase();
@@ -3160,7 +3217,7 @@ async function vfCopy() {
   }
 }
 
-// 从画廊直接把这支视频送进截帧页
+// 从画廊直接把这支视频送进工具页的视频截帧
 async function fxOpenPath(path, name, creator) {
   setView("frame");
   if (state.frame.pending) {
@@ -3213,6 +3270,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
 });
 
 $("toLive").addEventListener("click", () => {
+  state.tool = "live";
   setView("tools");
 });
 
@@ -3314,7 +3372,7 @@ $("link").addEventListener("paste", () => {
 
 // Ctrl / Cmd + K 跳到下载链接框；在空白处按 / 聚焦当前页搜索框（或下载链接框）
 window.addEventListener("keydown", (e) => {
-  if (document.querySelector("dialog[open]") || state.view === "frame") return;
+  if (document.querySelector("dialog[open]") || isFrameActive()) return;
   const tag = (e.target.tagName || "").toLowerCase();
   const typing = tag === "input" || tag === "textarea" || tag === "select";
   if (e.key === "k" && (e.ctrlKey || e.metaKey)) {
