@@ -14,6 +14,13 @@ DIR_UID_RE = re.compile(r"^UID(\d+)_(.+)$")
 FOLDER_SUFFIX = "_发布作品"
 
 
+_COMFY_SUFFIX_RE = re.compile(r"(?:_comfy(?:_\d+)?|_\d{5}_?)+$", re.IGNORECASE)
+
+
+def _strip_comfy_suffix(stem):
+    return _COMFY_SUFFIX_RE.sub("", stem)
+
+
 def _post_group_key(stem):
     """只在符合 DouK 命名规则且属于多文件分片时才剥掉末尾 _序号。"""
     m = POST_NAME_RE.match(stem)
@@ -89,6 +96,7 @@ def scan_creator_posts(folder, nickname=""):
                 "size": f[1],
             } for f in files],
             "frames": [],
+            "comfy": [],
         })
 
     # 把「截帧/<博主目录>/」里对应视频的截图挂到所属作品下
@@ -125,6 +133,51 @@ def scan_creator_posts(folder, nickname=""):
                     "size": st.st_size,
                     "is_frame": True,
                 })
+
+    # 把「ComfyUI/<博主目录>/」里的工作流生成图挂到所属作品的 comfy 子画廊下
+    comfy_dir = folder.parent / config.COMFY_DIR / folder.name
+    if comfy_dir.is_dir() and posts:
+        by_file_stem = {}
+        by_post_key = {}
+        for p_item in posts:
+            by_post_key.setdefault(p_item["key"], p_item)
+            for f_item in p_item["files"]:
+                by_file_stem.setdefault(Path(f_item["path"]).stem, p_item)
+            for fr_item in p_item["frames"]:
+                by_file_stem.setdefault(Path(fr_item["path"]).stem, p_item)
+        try:
+            comfy_files = sorted(comfy_dir.iterdir(), key=lambda x: x.name)
+        except OSError:
+            comfy_files = []
+        for img in comfy_files:
+            if not img.is_file() or img.suffix.lower() not in config.IMAGE_EXT:
+                continue
+            orig_stem = _strip_comfy_suffix(img.stem)
+            target_post = by_file_stem.get(orig_stem) or by_post_key.get(_post_group_key(orig_stem))
+            if not target_post and "_帧_" in orig_stem:
+                frame_prefix = orig_stem.split("_帧_", 1)[0]
+                for p_item in posts:
+                    if any(
+                        f_item["kind"] == "video"
+                        and config.safe_name(Path(f_item["path"]).stem, 80) == frame_prefix
+                        for f_item in p_item["files"]
+                    ):
+                        target_post = p_item
+                        break
+            if not target_post:
+                continue
+            try:
+                st = img.stat()
+            except OSError:
+                continue
+            target_post["comfy"].append({
+                "name": img.name,
+                "path": str(img),
+                "kind": "image",
+                "size": st.st_size,
+                "mtime": st.st_mtime_ns,
+                "is_comfy": True,
+            })
 
     posts.sort(key=lambda x: (x["time"], x["key"]), reverse=True)
     return posts, total_files, total_bytes

@@ -47,12 +47,13 @@ DEFAULT_CONFIG = {
 STALE_MSG = "接口不存在：界面服务还是旧版本，先双击「星图画廊」重启一次（不行再运行 scripts\\停止.cmd）"
 
 FRAME_DIR = "截帧"
+COMFY_DIR = "ComfyUI"
 LIVE_OUT = "LivePhotos"
 LIVE_INDEX = "_index.json"
 NAME_EXTS = (".HEIC", ".JPG", ".MOV")
 SKIP_DIRS = {
     "LivePhotos", "Cache", "cache", "Data",
-    "$RECYCLE.BIN", "System Volume Information", FRAME_DIR,
+    "$RECYCLE.BIN", "System Volume Information", FRAME_DIR, COMFY_DIR,
 }
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".heic", ".heif"}
 VIDEO_EXT = {".mp4", ".mov", ".m4v"}

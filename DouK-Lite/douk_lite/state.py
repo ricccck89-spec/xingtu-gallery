@@ -11,6 +11,7 @@ from douk_lite import config
 
 _jobs = {}
 _jobs_lock = threading.Lock()
+_comfy_running = False
 _parse_items = {}
 _parse_order = []
 
@@ -63,8 +64,16 @@ def presence_disconnect():
             _client_lost_at = time.time()
 
 
+def set_comfy_running(running: bool):
+    global _comfy_running
+    with _jobs_lock:
+        _comfy_running = bool(running)
+
+
 def has_active_work_jobs():
     with _jobs_lock:
+        if _comfy_running:
+            return True
         for job in _jobs.values():
             if job.get("running") and job.get("kind") in ("download", "livephoto"):
                 return True

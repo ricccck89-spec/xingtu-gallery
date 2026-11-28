@@ -6,16 +6,16 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0F1211">
 <title>星图画廊 · 博主作品库</title>
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="/icon.png">
-<link rel="apple-touch-icon" href="/icon-180.png">
-<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="shell">
 
-  <aside class="rail">
+  <aside class="rail" id="appRail" aria-label="主导航">
     <div class="rail-top">
       <div class="brand">
         <span class="mark" aria-hidden="true">
@@ -30,39 +30,68 @@
         </span>
       </div>
 
-      <button class="status" id="status" type="button" aria-live="polite">
-        <i></i><span id="statusText">连接中</span>
-      </button>
-    </div>
-
-    <nav class="nav" aria-label="功能">
-      <button class="nav-item is-on" data-view="gallery" type="button">
-        <span>画廊</span>
-      </button>
-      <button class="nav-item" data-view="discover" type="button">
-        <span>发现</span>
-      </button>
-      <button class="nav-item" data-view="tools" type="button">
-        <span>工具</span>
-        <span class="nav-count" id="navLiveCount" hidden>0</span>
-      </button>
-    </nav>
-
-    <div class="rail-block">
-      <span class="rail-label">保存到</span>
-      <div class="path">
-        <input id="destPath" type="text" autocomplete="off" spellcheck="false"
-               placeholder="下载保存目录" title="直接改这里，回车或点到别处就生效">
-        <div class="path-btns">
-          <button class="mini" id="browseDest" type="button" title="选择文件夹">浏览</button>
-          <button class="mini" id="openDest" type="button" title="在资源管理器里打开">打开</button>
-        </div>
+      <div class="rail-top-actions">
+        <button class="status" id="status" type="button" aria-live="polite" title="服务连接状态">
+          <i aria-hidden="true"></i><span id="statusText">连接中</span>
+        </button>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-expanded="false" aria-controls="railDrawer" aria-label="展开导航菜单">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M3.5 6h13M3.5 10h13M3.5 14h13"/>
+          </svg>
+        </button>
       </div>
     </div>
 
-    <div class="rail-foot">
-      <button class="ghost" id="openSettings" type="button">设置</button>
-      <span class="rail-ver">本地运行 · 127.0.0.1:8765</span>
+    <div class="rail-drawer" id="railDrawer">
+      <nav class="nav" aria-label="功能">
+        <button class="nav-item is-on" data-view="gallery" type="button">
+          <svg class="nav-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="6" height="6" rx="1"/>
+            <rect x="11" y="3" width="6" height="6" rx="1"/>
+            <rect x="3" y="11" width="6" height="6" rx="1"/>
+            <rect x="11" y="11" width="6" height="6" rx="1"/>
+          </svg>
+          <span class="nav-label">画廊</span>
+        </button>
+        <button class="nav-item" data-view="discover" type="button">
+          <svg class="nav-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="10" cy="10" r="7"/>
+            <polygon points="12.8 7.2 11.2 11.2 7.2 12.8 8.8 8.8"/>
+          </svg>
+          <span class="nav-label">发现</span>
+        </button>
+        <button class="nav-item" data-view="tools" type="button">
+          <svg class="nav-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="14" height="12" rx="1.5"/>
+            <path d="M7 4v12M13 4v12M3 8h4M13 8h4M3 12h4M13 12h4"/>
+          </svg>
+          <span class="nav-label">工具</span>
+          <span class="nav-count" id="navLiveCount" hidden>0</span>
+        </button>
+      </nav>
+
+      <div class="rail-block">
+        <label class="rail-label" for="destPath">保存到</label>
+        <div class="path">
+          <input id="destPath" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="下载保存目录" title="直接改这里，回车或点到别处就生效">
+          <div class="path-btns">
+            <button class="mini" id="browseDest" type="button" title="选择文件夹">浏览</button>
+            <button class="mini" id="openDest" type="button" title="在资源管理器里打开">打开</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="rail-foot">
+        <button class="ghost rail-settings-btn" id="openSettings" type="button">
+          <svg class="nav-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="10" cy="10" r="2.6"/>
+            <path d="M10 3v1.6M10 15.4V17M3 10h1.6M15.4 10H17M5.05 5.05l1.13 1.13M13.82 13.82l1.13 1.13M14.95 5.05l-1.13 1.13M6.18 13.82l-1.13 1.13"/>
+          </svg>
+          <span>设置</span>
+        </button>
+        <span class="rail-ver">本地运行 · 127.0.0.1:8765</span>
+      </div>
     </div>
   </aside>
 
@@ -73,52 +102,53 @@
 
     <!-- ============ 画廊首页 ============ -->
     <section class="view" id="viewGallery">
-      <section class="intro gallery-intro">
-        <p class="eyebrow">MEDIA LIBRARY</p>
-        <h1>你的博主，<br>收进一座画廊</h1>
-        <p class="sub">下载过的博主和作品都在这里。点开一位博主看她的全部作品，或者直接在下面按时间浏览所有人的图片和视频。</p>
-        <p class="keys">粘贴解析和下载在「发现」 · 实况转换与逐帧截取都在「工具」</p>
-      </section>
+      <header class="view-head">
+        <div>
+          <h1>画廊</h1>
+          <p class="view-sub">下载过的博主与作品都在这里，点开一位博主查看全部作品或按时间浏览</p>
+        </div>
+        <div class="actions">
+          <button class="ghost" id="creatorRefresh" type="button" title="重新读取名单和本地文件">刷新</button>
+          <button class="ghost" id="galPickModeBtn" type="button" title="开启后可直接点击画廊作品挑选图片去 ComfyUI 批量处理">批量选图</button>
+          <button class="primary" id="addCreator" type="button">去发现</button>
+        </div>
+      </header>
 
       <section class="gal-stats" id="galStats" aria-label="画廊统计">
         <div class="stat">
-          <span class="stat-num" id="statCreators">0</span>
+          <span class="stat-num num" id="statCreators">0</span>
           <span class="stat-label">位博主</span>
         </div>
         <div class="stat">
-          <span class="stat-num" id="statPosts">0</span>
+          <span class="stat-num num" id="statPosts">0</span>
           <span class="stat-label">条作品</span>
         </div>
         <div class="stat">
-          <span class="stat-num" id="statFiles">0</span>
+          <span class="stat-num num" id="statFiles">0</span>
           <span class="stat-label">个文件</span>
         </div>
         <div class="stat">
-          <span class="stat-num" id="statBytes">—</span>
+          <span class="stat-num num" id="statBytes">—</span>
           <span class="stat-label">占用空间</span>
         </div>
       </section>
 
       <section class="creators" id="creatorsBar">
         <div class="section-head">
-          <div>
+          <div class="section-title-group">
             <h2>我的博主</h2>
             <p class="meta" id="creatorMeta"></p>
-          </div>
-          <div class="actions">
-            <button class="mini" id="creatorRefresh" type="button" title="重新读取名单和本地文件">刷新</button>
-            <button class="ghost" id="addCreator" type="button">去添加</button>
           </div>
         </div>
         <div class="creator-grid" id="creatorGrid"></div>
         <div class="empty creator-empty" id="creatorEmpty" hidden>
-          还没有记录。去「下载」页贴一个博主主页链接解析一次，她就会出现在这里。
+          还没有记录。去「发现」页贴一个博主主页链接解析一次，她就会出现在这里。
         </div>
       </section>
 
       <section class="feed" id="feed">
         <div class="section-head">
-          <div>
+          <div class="section-title-group">
             <h2>全部作品</h2>
             <p class="meta" id="feedMeta">正在读取本地作品…</p>
           </div>
@@ -137,7 +167,7 @@
           </div>
         </div>
 
-        <div class="tabs" id="galFilters">
+        <div class="tabs" id="galFilters" role="tablist" aria-label="作品类型筛选">
           <button class="tab is-on" data-ft="all" type="button">全部 0</button>
           <button class="tab" data-ft="视频" type="button">视频 0</button>
           <button class="tab" data-ft="图集" type="button">图集 0</button>
@@ -152,36 +182,42 @@
     <!-- ============ 博主详情 ============ -->
     <section class="view" id="viewCreator" hidden>
       <div class="creator-top">
-        <button class="ghost back" id="creatorBack" type="button">← 返回画廊</button>
+        <button class="ghost back" id="creatorBack" type="button">
+          <svg class="btn-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10 3.5L5.5 8l4.5 4.5"/>
+          </svg>
+          <span>返回画廊</span>
+        </button>
         <div class="actions">
           <button class="ghost" id="libBrowseHome" type="button">预览Ta主页</button>
-          <button class="ghost" id="libNewest" type="button">下载最新作品</button>
           <button class="ghost" id="libRemark" type="button">备注</button>
           <button class="ghost" id="libFolder" type="button">打开文件夹</button>
           <button class="ghost" id="libRefresh" type="button">刷新</button>
+          <button class="primary" id="libNewest" type="button">下载最新作品</button>
         </div>
       </div>
 
       <section class="library" id="library">
-        <section class="lib-hero">
+        <div class="lib-hero">
           <span class="lib-avatar" id="libAvatar"></span>
           <div class="lib-name">
-            <p class="eyebrow" id="libUid">CREATOR</p>
-            <h2 id="libTitle">博主</h2>
+            <h1 id="libTitle">博主</h1>
+            <p class="lib-uid" id="libUid"></p>
             <p class="meta" id="libMeta">正在读取本地作品…</p>
           </div>
-        </section>
+        </div>
 
         <div class="lib-stats" id="creatorStats"></div>
 
         <div class="creator-toolbar">
-          <div class="tabs lib-tabs" id="libFilters">
+          <div class="tabs lib-tabs" id="libFilters" role="tablist" aria-label="博主作品类型">
             <button class="tab is-on" data-ft="all" type="button">全部 0</button>
             <button class="tab" data-ft="视频" type="button">视频 0</button>
             <button class="tab" data-ft="图集" type="button">图集 0</button>
             <button class="tab" data-ft="实况" type="button">实况 0</button>
           </div>
           <div class="feed-tools">
+            <button class="ghost" id="libPickModeBtn" type="button" title="开启后可直接点击作品挑选图片去 ComfyUI 批量处理">批量选图</button>
             <input id="libSearch" class="search" type="search" autocomplete="off"
                    spellcheck="false" placeholder="搜这位博主的作品">
             <select id="libSort" class="select" aria-label="排序方式">
@@ -200,16 +236,15 @@
 
     <!-- ============ 发现 ============ -->
     <section class="view" id="viewDiscover" hidden>
-      <header class="lib-head">
+      <header class="view-head">
         <div>
-          <p class="eyebrow">DISCOVER</p>
-          <h1 class="lib-title">发现博主与作品</h1>
-          <p class="sub">不用去网站来回切，直接刷小红书主页推荐或按关键词找抖音博主，点一下即可整页解析下载。</p>
+          <h1>发现</h1>
+          <p class="view-sub">直接刷小红书主页推荐或按关键词找抖音博主，点一下即可整页解析下载</p>
         </div>
         <div class="discover-head-actions">
-          <div class="modes" id="discoverPlatformTabs" role="tablist" aria-label="平台">
-            <button class="mode is-on" data-dplat="xhs" role="tab" aria-selected="true" type="button">小红书主页推荐</button>
-            <button class="mode" data-dplat="douyin" role="tab" aria-selected="false" type="button">抖音美女推荐</button>
+          <div class="segmented" id="discoverPlatformTabs" role="tablist" aria-label="平台">
+            <button class="seg-btn is-on" data-dplat="xhs" role="tab" aria-selected="true" type="button">小红书主页推荐</button>
+            <button class="seg-btn" data-dplat="douyin" role="tab" aria-selected="false" type="button">抖音美女推荐</button>
           </div>
           <button class="ghost" id="toggleLinkParse" type="button">+ 指定链接下载</button>
         </div>
@@ -217,13 +252,13 @@
 
       <section class="discover-link-panel" id="viewDownload" hidden>
         <div class="discover-link-head">
-          <strong>指定链接解析下载</strong>
+          <h2>指定链接解析下载</h2>
           <button class="mini" id="closeLinkParse" type="button">收起</button>
         </div>
-        <section class="console">
-          <div class="modes" role="tablist" aria-label="解析方式">
-            <button class="mode is-on" data-mode="work" role="tab" aria-selected="true" type="button">单个作品</button>
-            <button class="mode" data-mode="user" role="tab" aria-selected="false" type="button">博主全部作品</button>
+        <div class="console">
+          <div class="segmented" role="tablist" aria-label="解析方式">
+            <button class="mode seg-btn is-on" data-mode="work" role="tab" aria-selected="true" type="button">单个作品</button>
+            <button class="mode seg-btn" data-mode="user" role="tab" aria-selected="false" type="button">博主全部作品</button>
           </div>
 
           <div class="tray" id="tray">
@@ -238,7 +273,7 @@
             <input type="checkbox" id="quickParse">
             <span>快速解析：只取最近 30 天，几秒出结果（更早的作品这次不列）</span>
           </label>
-        </section>
+        </div>
 
         <section class="result" id="result" hidden>
           <div class="result-head">
@@ -295,7 +330,7 @@
         <div class="discover-user-head">
           <button class="ghost" id="discoverUserBack" type="button">← 返回</button>
           <div class="discover-user-id">
-            <img class="discover-creator-avatar" id="discoverUserAvatar" alt="" hidden>
+            <img class="discover-creator-avatar" id="discoverUserAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="" hidden>
             <div>
               <h2 id="discoverUserName">博主主页</h2>
               <p class="meta" id="discoverUserMeta"></p>
@@ -310,7 +345,7 @@
 
       <div id="discoverXhsPane">
         <div class="discover-bar">
-          <div class="filters" id="discoverXhsCats">
+          <div class="tabs discover-cats" id="discoverXhsCats">
             <button class="tab is-on" data-cat="homefeed.fashion_v3" type="button">穿搭</button>
             <button class="tab" data-cat="homefeed.cosmetics_v3" type="button">彩妆</button>
             <button class="tab" data-cat="homefeed_recommend" type="button">推荐</button>
@@ -339,7 +374,7 @@
 
       <div id="discoverDyPane" hidden>
         <div class="discover-bar">
-          <div class="filters" id="discoverDyCats">
+          <div class="tabs discover-cats" id="discoverDyCats">
             <button class="tab is-on" data-dycat="beauty" type="button">精选美女</button>
             <button class="tab" data-dycat="outfit" type="button">穿搭御姐</button>
             <button class="tab" data-dycat="dance" type="button">热舞颜值</button>
@@ -360,15 +395,16 @@
 
     <!-- ============ 工具 ============ -->
     <section class="view" id="viewTools" hidden>
-      <section class="intro tools-head">
-        <p class="eyebrow">TOOLS</p>
-        <h1>工具，<br>把素材变成成品</h1>
-        <p class="sub">本地处理已下载的素材：实况照片封装、视频逐帧截取，后续还会陆续增加更多实用工具。</p>
-        <div class="modes tools-tabs" id="toolsTabs" role="tablist" aria-label="工具列表">
-          <button class="mode is-on" data-tool="live" role="tab" aria-selected="true" type="button">实况照片</button>
-          <button class="mode" data-tool="frame" role="tab" aria-selected="false" type="button">视频截帧</button>
+      <header class="view-head">
+        <div>
+          <h1>工具</h1>
+          <p class="view-sub">本地处理已下载的素材：实况照片封装、视频逐帧截取</p>
         </div>
-      </section>
+        <div class="segmented tools-tabs" id="toolsTabs" role="tablist" aria-label="工具列表">
+          <button class="seg-btn is-on" data-tool="live" role="tab" aria-selected="true" type="button">实况照片</button>
+          <button class="seg-btn" data-tool="frame" role="tab" aria-selected="false" type="button">视频截帧</button>
+        </div>
+      </header>
 
       <!-- 实况照片 -->
       <section class="tool-panel" id="toolLive" data-tool-panel="live">
@@ -413,87 +449,87 @@
         </div>
 
         <div class="fx-layout">
-        <aside class="fx-side">
-          <div class="fx-side-head">
-            <input id="fxSearch" class="search" type="search" autocomplete="off"
-                   spellcheck="false" placeholder="搜视频或博主">
-            <select id="fxKind" class="select" aria-label="视频类型">
-              <option value="all">全部视频</option>
-              <option value="live">实况视频</option>
-              <option value="normal">普通视频</option>
-            </select>
-          </div>
-          <div class="fx-list" id="fxList"></div>
-        </aside>
-
-        <div class="fx-main">
-          <div class="fx-stage" id="fxStage">
-            <video id="fxVideo" playsinline muted preload="metadata"></video>
-            <span class="fx-caption" id="fxName" hidden></span>
-            <div class="fx-empty" id="fxEmpty">
-              <p class="fx-empty-big">点开左边的博主，再选一条视频</p>
-              <p class="fx-empty-small">
-                每个博主点一下展开他的视频，再用方向键逐帧走，胶片条点一下就跳过去。<br>
-                存下来的 PNG 会直接写进 <b>截帧</b> 文件夹，不弹浏览器下载。
-              </p>
+          <aside class="fx-side">
+            <div class="fx-side-head">
+              <input id="fxSearch" class="search" type="search" autocomplete="off"
+                     spellcheck="false" placeholder="搜视频或博主">
+              <select id="fxKind" class="select" aria-label="视频类型">
+                <option value="all">全部视频</option>
+                <option value="live">实况视频</option>
+                <option value="normal">普通视频</option>
+              </select>
             </div>
+            <div class="fx-list" id="fxList"></div>
+          </aside>
 
-            <div class="fx-err" id="fxErr" hidden>
-              <h3 id="fxErrTitle">这个文件解不开</h3>
-              <p id="fxErrBody"></p>
-              <code id="fxErrCmd"></code>
-              <div class="fx-err-row">
-                <button class="ghost" id="fxErrAuto" type="button">用 ffmpeg 挑最清晰一帧</button>
-                <button class="ghost" id="fxErrCopy" type="button">复制转码命令</button>
-                <button class="ghost" id="fxErrClose" type="button">知道了</button>
+          <div class="fx-main">
+            <div class="fx-stage" id="fxStage">
+              <video id="fxVideo" playsinline muted preload="metadata"></video>
+              <span class="fx-caption" id="fxName" hidden></span>
+              <div class="fx-empty" id="fxEmpty">
+                <p class="fx-empty-big">点开左边的博主，再选一条视频</p>
+                <p class="fx-empty-small">
+                  每个博主点一下展开他的视频，再用方向键逐帧走，胶片条点一下就跳过去。<br>
+                  存下来的 PNG 会直接写进 <b>截帧</b> 文件夹，不弹浏览器下载。
+                </p>
+              </div>
+
+              <div class="fx-err" id="fxErr" hidden>
+                <h3 id="fxErrTitle">这个文件解不开</h3>
+                <p id="fxErrBody"></p>
+                <code id="fxErrCmd"></code>
+                <div class="fx-err-row">
+                  <button class="ghost" id="fxErrAuto" type="button">用 ffmpeg 挑最清晰一帧</button>
+                  <button class="ghost" id="fxErrCopy" type="button">复制转码命令</button>
+                  <button class="ghost" id="fxErrClose" type="button">知道了</button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="fx-strip" id="fxStrip"></div>
+            <div class="fx-strip" id="fxStrip"></div>
 
-          <div class="fx-timeline">
-            <input type="range" id="fxSeek" min="0" max="1" step="0.001" value="0"
-                   aria-label="播放进度">
-            <div class="fx-ticks" id="fxTicks"></div>
-          </div>
-
-          <div class="fx-controls">
-            <div class="fx-group">
-              <button class="fx-ic" id="fxStart" type="button" title="回到开头 (Home)" aria-label="回到开头">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-              </button>
-              <button class="fx-ic" id="fxBack1" type="button" title="后退 1 秒 (J)" aria-label="后退一秒">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 6v12L2 12zM20 6v12l-9-6z"/></svg>
-              </button>
-              <button class="fx-ic" id="fxPrev" type="button" title="上一帧 (←)" aria-label="上一帧">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6v12L6 12zM18 6h2v12h-2z"/></svg>
-              </button>
-              <button class="fx-ic fx-play" id="fxPlay" type="button" title="播放 / 暂停 (空格)" aria-label="播放或暂停">
-                <svg id="fxPlayIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-              </button>
-              <button class="fx-ic" id="fxNext" type="button" title="下一帧 (→)" aria-label="下一帧">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12l9-6zM4 6h2v12H4z"/></svg>
-              </button>
-              <button class="fx-ic" id="fxFwd1" type="button" title="前进 1 秒 (L)" aria-label="前进一秒">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 6v12l9-6zM4 6v12l9-6z"/></svg>
-              </button>
+            <div class="fx-timeline">
+              <input type="range" id="fxSeek" min="0" max="1" step="0.001" value="0"
+                     aria-label="播放进度">
+              <div class="fx-ticks" id="fxTicks"></div>
             </div>
 
-            <span class="fx-clock" id="fxClock">00:00.000 <i>/</i> 00:00.000</span>
-            <span class="fx-frame" id="fxFrameNo">第 — 帧</span>
+            <div class="fx-controls">
+              <div class="fx-group">
+                <button class="fx-ic" id="fxStart" type="button" title="回到开头 (Home)" aria-label="回到开头">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                </button>
+                <button class="fx-ic" id="fxBack1" type="button" title="后退 1 秒 (J)" aria-label="后退一秒">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 6v12L2 12zM20 6v12l-9-6z"/></svg>
+                </button>
+                <button class="fx-ic" id="fxPrev" type="button" title="上一帧 (←)" aria-label="上一帧">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6v12L6 12zM18 6h2v12h-2z"/></svg>
+                </button>
+                <button class="fx-ic fx-play" id="fxPlay" type="button" title="播放 / 暂停 (空格)" aria-label="播放或暂停">
+                  <svg id="fxPlayIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button class="fx-ic" id="fxNext" type="button" title="下一帧 (→)" aria-label="下一帧">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12l9-6zM4 6h2v12H4z"/></svg>
+                </button>
+                <button class="fx-ic" id="fxFwd1" type="button" title="前进 1 秒 (L)" aria-label="前进一秒">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 6v12l9-6zM4 6v12l9-6z"/></svg>
+                </button>
+              </div>
 
-            <button class="ghost fx-zoom" id="fxZoom" type="button" title="切换 适应 / 原始像素">适应窗口</button>
+              <span class="fx-clock" id="fxClock">00:00.000 <i>/</i> 00:00.000</span>
+              <span class="fx-frame" id="fxFrameNo">第 — 帧</span>
 
-            <div class="fx-actions">
-              <button class="ghost" id="fxCopy" type="button" title="把这一帧复制到剪贴板 (C)">复制图片</button>
-              <button class="primary" id="fxSave" type="button" title="保存这一帧为 PNG (S)">保存 PNG</button>
+              <button class="ghost fx-zoom" id="fxZoom" type="button" title="切换 适应 / 原始像素">适应窗口</button>
+
+              <div class="fx-actions">
+                <button class="ghost" id="fxCopy" type="button" title="把这一帧复制到剪贴板 (C)">复制图片</button>
+                <button class="primary" id="fxSave" type="button" title="保存这一帧为 PNG (S)">保存 PNG</button>
+              </div>
             </div>
-          </div>
 
-          <div class="fx-saved" id="fxSaved" hidden></div>
+            <div class="fx-saved" id="fxSaved" hidden></div>
+          </div>
         </div>
-      </div>
       </section>
     </section>
   </main>
@@ -541,7 +577,7 @@
         <span>最高画质</span>
         <small>优先抓取原画视频，文件更大、耗时略长</small>
       </div>
-      <button class="switch" id="setQuality" type="button" role="switch" aria-checked="false"></button>
+      <button class="switch" id="setQuality" type="button" role="switch" aria-checked="false" aria-label="最高画质"></button>
     </div>
 
     <div class="field row">
@@ -549,7 +585,7 @@
         <span>图片取最清晰源</span>
         <small>图集下载前先探一遍高清地址（去掉压缩模板 / q100），挑分辨率最大的那张；探不到就用原地址</small>
       </div>
-      <button class="switch" id="setBestImage" type="button" role="switch" aria-checked="true"></button>
+      <button class="switch" id="setBestImage" type="button" role="switch" aria-checked="true" aria-label="图片取最清晰源"></button>
     </div>
 
     <label class="field">
@@ -559,7 +595,8 @@
 
     <label class="field">
       <span>小红书 Cookie（支持直接粘贴 F12 表格 / JSON / a1=…; web_session=…）</span>
-      <textarea id="setXhsCookie" rows="3" spellcheck="false" placeholder="在浏览器登录 xiaohongshu.com 后，F12 复制 Cookie 表格或用 Cookie-Editor 导出粘贴到这里" style="width:100%;resize:vertical;padding:8px 10px;border-radius:7px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-family:var(--mono);font-size:12px;"></textarea>
+      <textarea id="setXhsCookie" class="field-textarea field-textarea-code" rows="3" spellcheck="false"
+                placeholder="在浏览器登录 xiaohongshu.com 后，F12 复制 Cookie 表格或用 Cookie-Editor 导出粘贴到这里"></textarea>
     </label>
 
     <div class="settings-foot">
@@ -572,16 +609,22 @@
 <dialog id="discoverPreview" class="viewer">
   <div class="dp-shell">
     <div class="dp-stage">
-      <img id="dpImg" alt="" hidden>
+      <img id="dpImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="" hidden>
       <video id="dpVideo" controls playsinline hidden></video>
-      <button class="dp-nav dp-prev" id="dpPrev" type="button" hidden>‹</button>
-      <button class="dp-nav dp-next" id="dpNext" type="button" hidden>›</button>
-      <span class="dp-counter" id="dpCounter" hidden>1 / 1</span>
-      <button class="dp-close" id="dpClose" type="button" aria-label="关闭">×</button>
+      <button class="dp-nav dp-prev" id="dpPrev" type="button" hidden aria-label="上一张">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg>
+      </button>
+      <button class="dp-nav dp-next" id="dpNext" type="button" hidden aria-label="下一张">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg>
+      </button>
+      <span class="dp-counter num" id="dpCounter" hidden>1 / 1</span>
+      <button class="dp-close" id="dpClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
     </div>
     <div class="dp-side">
       <div class="dp-author">
-        <img class="discover-avatar" id="dpAvatar" alt="" hidden>
+        <img class="discover-avatar" id="dpAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="" hidden>
         <span id="dpNick"></span>
       </div>
       <h3 class="dp-title" id="dpTitle"></h3>
@@ -602,6 +645,10 @@
         <p class="meta" id="viewerMeta"></p>
       </div>
       <div class="actions">
+        <button class="ghost" id="viewerComfyToggle" type="button"
+                title="查看或管理该作品的 ComfyUI 工作流成品">工作流子画廊 (0)</button>
+        <button class="ghost" id="viewerAddComfy" type="button" hidden
+                title="把当前这张图片加入 ComfyUI 批处理列表">加入批处理</button>
         <button class="ghost" id="viewerExtract" type="button" hidden
                 title="用 ffmpeg 抽一帧（JPG），浏览器解不开的编码也能用">抽这一帧</button>
         <button class="ghost" id="viewerOpen" type="button">打开文件夹</button>
@@ -644,17 +691,87 @@
         <button class="primary" id="vfSave" type="button" title="保存这一帧为 PNG (S)">保存 PNG</button>
       </div>
     </div>
+    <div class="viewer-thumbs" id="viewerThumbs" hidden></div>
     <div class="viewer-frames" id="viewerFrames" hidden></div>
+    <section class="viewer-comfy" id="viewerComfy" hidden></section>
     <footer class="viewer-foot">
       <button class="ghost" id="viewerPrev" type="button">上一个</button>
-      <span class="meta" id="viewerCount"></span>
+      <select id="viewerJump" class="select viewer-jump" aria-label="选择查看第几个" hidden></select>
+      <span class="meta num" id="viewerCount"></span>
       <button class="ghost" id="viewerNext" type="button">下一个</button>
     </footer>
   </div>
 </dialog>
 
+<div class="comfy-bar" id="comfyPickBar" hidden>
+  <span class="comfy-bar-count num" id="comfyPickCount">已选 0 张图片</span>
+  <div class="comfy-bar-actions">
+    <button class="ghost" id="comfyPickClear" type="button">清空</button>
+    <button class="ghost" id="comfyPickExit" type="button">退出选图</button>
+    <button class="primary" id="comfyOpenDialog" type="button">ComfyUI 批处理 →</button>
+  </div>
+</div>
+
+<dialog id="comfyDialog" class="settings comfy-dialog">
+  <div class="settings-body comfy-form">
+    <h2>ComfyUI 批量图片处理</h2>
+
+    <div class="comfy-sel-head">
+      <span class="num" id="comfyDlgCount">已选 0 张图片</span>
+      <button class="ghost mini-action" id="comfyDlgClear" type="button">清空列表</button>
+    </div>
+    <div class="comfy-thumb-strip" id="comfyThumbStrip"></div>
+
+    <div class="comfy-preset-bar">
+      <select id="comfyPresetSelect" class="select" aria-label="提示词预设">
+        <option value="">选择提示词预设…</option>
+      </select>
+      <button class="ghost mini-action" id="comfyPresetSaveBtn" type="button">存为预设</button>
+      <button class="ghost mini-action danger" id="comfyPresetDelBtn" type="button">删除预设</button>
+    </div>
+
+    <label class="field">
+      <span>提示词</span>
+      <textarea id="comfyPrompt" class="field-textarea" rows="4" spellcheck="false" placeholder="输入处理提示词…"></textarea>
+    </label>
+
+    <div class="comfy-prog-wrap">
+      <div class="comfy-prog-track"><div class="comfy-prog-fill" id="comfyProgFill"></div></div>
+      <p class="meta" id="comfyStatusText">就绪</p>
+    </div>
+
+    <pre class="comfy-log" id="comfyLog"></pre>
+
+    <details class="comfy-advanced">
+      <summary>高级设置（输出目录 / 服务地址 / 工作流）</summary>
+      <div class="comfy-advanced-body">
+        <div class="comfy-grid2">
+          <label class="field">
+            <span>ComfyUI 临时子目录（自动归入作品子画廊）</span>
+            <input id="comfyPrefix" type="text" value="QW21_batch">
+          </label>
+          <label class="field">
+            <span>ComfyUI 地址</span>
+            <input id="comfyServer" type="text" value="http://127.0.0.1:8188">
+          </label>
+        </div>
+        <label class="field">
+          <span>工作流 JSON 路径</span>
+          <input id="comfyWorkflow" type="text" spellcheck="false">
+        </label>
+      </div>
+    </details>
+
+    <div class="settings-foot">
+      <button class="ghost" id="comfyDlgClose" type="button">关闭</button>
+      <button class="ghost danger" id="comfyStopBtn" type="button" hidden>停止（跑完当前张后停）</button>
+      <button class="primary" id="comfyStartBtn" type="button">开始批处理</button>
+    </div>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" hidden></div>
 
-<script src="/app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

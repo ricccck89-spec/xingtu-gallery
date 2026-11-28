@@ -61,10 +61,23 @@ const state = {
     tab: "post", posts: [], filter: "all", q: "", sort: "newest", shown: 60,
     files: 0, bytes: 0, exists: false,
   },
-  viewer: { files: [], index: 0, title: "", video: null, creator: "" },
+  viewer: {
+    post: null,
+    mainFiles: [],
+    comfyFiles: [],
+    subMode: "main",
+    mainIndex: 0,
+    comfyIndex: 0,
+    files: [],
+    index: 0,
+    title: "",
+    video: null,
+    creator: "",
+  },
   live: { items: [], tools: null, id: null, running: false, poll: null, shown: 300, lastResp: null },
   frame: { items: [], selected: null, kind: "all", q: "", scanToken: 0, loaded: false, busy: false, out: "" },
   tool: "live",
+  comfy: { pickMode: false, files: new Map(), pollTimer: null, promptDirty: false, presets: [] },
 };
 
 const PLACEHOLDER = {
@@ -129,7 +142,7 @@ async function checkHealth() {
 
 function setMode(mode) {
   state.mode = mode;
-  document.querySelectorAll(".mode").forEach((b) => {
+  document.querySelectorAll("#viewDownload [data-mode]").forEach((b) => {
     const on = b.dataset.mode === mode;
     b.classList.toggle("is-on", on);
     b.setAttribute("aria-selected", on ? "true" : "false");
@@ -140,7 +153,7 @@ function setMode(mode) {
   $("quickWrap").hidden = mode !== "user";
 }
 
-document.querySelectorAll(".mode").forEach((btn) => {
+document.querySelectorAll("#viewDownload [data-mode]").forEach((btn) => {
   btn.addEventListener("click", () => setMode(btn.dataset.mode));
 });
 
@@ -207,7 +220,7 @@ let parseTimer = null;
 // 解析博主主页可能要几十秒，先把结果区变成「正在读取」，带秒表，别让人以为卡死了
 function startParseUI() {
   $("result").hidden = false;
-  $("intro").classList.add("is-hidden");
+  $("intro")?.classList.add("is-hidden");
   $("resultTitle").textContent = "正在解析";
   $("resultMeta").textContent = "";
   $("userTabs").hidden = true;
@@ -340,7 +353,7 @@ async function doParse() {
       showHint(r.message || "解析失败，检查链接和 Cookie 是否有效", true);
       stopParseUI();
       $("result").hidden = true;
-      $("intro").classList.remove("is-hidden");
+      $("intro")?.classList.remove("is-hidden");
       return;
     }
     state.parseJob = r.job;
@@ -359,7 +372,7 @@ async function doParse() {
     if (!items.length) {
       stopParseUI();
       $("result").hidden = true;
-      $("intro").classList.remove("is-hidden");
+      $("intro")?.classList.remove("is-hidden");
       showHint(job.message || job.reason || "解析失败，检查链接和 Cookie 是否有效", true);
       return;
     }
@@ -391,7 +404,7 @@ async function doParse() {
   } catch (e) {
     stopParseUI();
     $("result").hidden = true;
-    $("intro").classList.remove("is-hidden");
+    $("intro")?.classList.remove("is-hidden");
     showHint("解析失败：" + e.message, true);
   } finally {
     state.parseJob = null;
@@ -443,7 +456,7 @@ function renderResult(r) {
   $("manifest").className = "manifest";
   renderManifest();
 
-  $("intro").classList.add("is-hidden");
+  $("intro")?.classList.add("is-hidden");
   $("result").hidden = false;
   $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -933,10 +946,11 @@ async function loadGallery(force) {
     renderCreatorWall();
   } catch (e) {
     if (token === g.token) {
-      $("feedMeta").textContent = "读取失败：" + e.message;
+      $("feedMeta").textContent = "未能连接本地服务";
       if (!g.loaded) {
-        $("creatorMeta").textContent = "读取失败";
-        $("creatorGrid").innerHTML = "";
+        $("creatorMeta").textContent = "未能连接本地服务";
+        $("creatorGrid").innerHTML = '<div class="empty">本地画廊服务未连接。请先启动后台服务后点击右上角「刷新」。</div>';
+        $("galGrid").innerHTML = '<div class="empty">暂无作品显示，连接本地服务后将自动加载本地作品流。</div>';
       }
     }
   } finally {
@@ -1093,9 +1107,11 @@ function creatorCard(c) {
 
   card.append(cover, shade, body);
 
-  const edit = mk("button", "wall-edit", "✎");
+  const edit = mk("button", "wall-edit");
   edit.type = "button";
   edit.title = "设置博主备注";
+  edit.setAttribute("aria-label", "设置博主备注");
+  edit.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.3 2.7l2 2L5.5 12.5H3.5v-2z"/></svg>';
   edit.addEventListener("click", async (ev) => {
     ev.stopPropagation();
     await promptCreatorRemark(c);
@@ -1103,9 +1119,11 @@ function creatorCard(c) {
   card.append(edit);
 
   if (c.sec_uid) {
-    const del = mk("button", "wall-del", "×");
+    const del = mk("button", "wall-del");
     del.type = "button";
     del.title = "移出名单（不会删掉已下载的文件）";
+    del.setAttribute("aria-label", "移出名单");
+    del.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
     del.addEventListener("click", async (ev) => {
       ev.stopPropagation();
       if (!window.confirm(`把「${c.nickname || "这位博主"}」移出名单？已经下载的文件不动。`)) return;
@@ -1364,7 +1382,8 @@ function attachAssetDrag(el, file, opts) {
   if (!rawPath || /^https?:/i.test(rawPath)) return;
   const rawName = (file.name || rawPath.split(/[\\/]/).pop() || "image.jpg").replace(/[:\\/\r\n]/g, "_");
   const isHeic = /\.(heic|heif)$/i.test(rawName);
-  const relUrl = "/api/asset?path=" + encodeURIComponent(rawPath) + (isHeic ? "&preview=1" : "");
+  const ver = file.mtime ? "&v=" + encodeURIComponent(String(file.mtime)) : "";
+  const relUrl = "/api/asset?path=" + encodeURIComponent(rawPath) + (isHeic ? "&preview=1" : "") + ver;
   const absUrl = new URL(relUrl, window.location.href).href;
   const filename = isHeic ? rawName.replace(/\.(heic|heif)$/i, ".jpg") : rawName;
   const mime = guessDragMime(filename, file.kind);
@@ -1407,6 +1426,7 @@ function postTile(p, opts) {
   fillThumb(cover, p.cover || "", { width: 320, noImgDrag: true });
   if (p.count > 1) cover.append(mk("span", "post-count", `${p.count} 个`));
   if (p.frames && p.frames.length) cover.append(mk("span", "post-frames", `截图 ${p.frames.length}`));
+  if (p.comfy && p.comfy.length) cover.append(mk("span", "post-comfy", `工作流 ${p.comfy.length}`));
   const badge = mk("span", "post-badge", p.type);
   badge.dataset.type = p.type;
   cover.append(badge);
@@ -1414,9 +1434,11 @@ function postTile(p, opts) {
     cover.append(mk("span", "post-owner", p.creator.remark || p.creator.nickname || p.creator.folder || ""));
   }
   if (p.files && p.files.length) {
-    const del = mk("button", "post-del", "×");
+    const del = mk("button", "post-del");
     del.type = "button";
     del.title = "移入回收站";
+    del.setAttribute("aria-label", "移入回收站");
+    del.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
     del.addEventListener("click", async (ev) => {
       ev.stopPropagation();
       const n = p.files.length;
@@ -1424,11 +1446,13 @@ function postTile(p, opts) {
       if (!window.confirm(`把${label}（${n} 个文件）移到回收站？`)) return;
       del.disabled = true;
       try {
-        const r = await api("/api/post/delete", { paths: p.files.map((f) => f.path) });
+        const delPaths = p.files.map((f) => f.path);
+        const r = await api("/api/post/delete", { paths: delPaths });
         if (!r.ok) {
           showToast(r.message || "删除失败");
           return;
         }
+        removeComfyPickedPaths(delPaths);
         showToast(`已将 ${r.deleted || n} 个文件移到回收站`);
         state.gallery.dirty = true;
         if (state.view === "gallery") loadGallery(true);
@@ -1447,15 +1471,62 @@ function postTile(p, opts) {
   body.append(mk("div", "post-date", (p.time || p.date || "").slice(0, 16)));
 
   tile.append(cover, body);
+
+  const postImgs = extractPostImages(p);
+  const pickBadge = mk("span", "post-pick-badge", "");
+  pickBadge.hidden = !state.comfy.pickMode;
+  cover.append(pickBadge);
+
+  function syncTilePickUI() {
+    const pickedCnt = postImgs.filter((f) => state.comfy.files.has(f.path)).length;
+    const isPicked = pickedCnt > 0;
+    tile.classList.toggle("is-picked", isPicked);
+    pickBadge.hidden = !state.comfy.pickMode && !isPicked;
+    if (isPicked) {
+      pickBadge.textContent = postImgs.length > 1 ? `已选 ${pickedCnt}/${postImgs.length}` : "已选";
+    } else {
+      pickBadge.textContent = postImgs.length ? `选 ${postImgs.length} 图` : "无图";
+    }
+  }
+  syncTilePickUI();
+  tile._syncPickUI = syncTilePickUI;
+
   attachAssetDrag(tile, pickPostDragFile(p), {
     ignoreSelector: "button",
     dragImageEl: () => cover.querySelector("img"),
   });
-  tile.addEventListener("click", () => openViewer(p));
+  attachComfyDrop(tile, () => {
+    const f = pickPostDragFile(p);
+    return f ? f.path : "";
+  }, {
+    onImported: (res) => {
+      if (!res || !res.file) return;
+      if (!Array.isArray(p.comfy)) p.comfy = [];
+      p.comfy.push(res.file);
+    },
+  });
+  tile.addEventListener("click", () => {
+    if (state.comfy.pickMode) {
+      if (!postImgs.length) {
+        showToast("这条作品没有可处理的图片或截帧");
+        return;
+      }
+      const allPicked = postImgs.every((f) => state.comfy.files.has(f.path));
+      if (allPicked) {
+        postImgs.forEach((f) => state.comfy.files.delete(f.path));
+      } else {
+        postImgs.forEach((f) => state.comfy.files.set(f.path, { path: f.path, name: f.name, mtime: f.mtime || f.size || "" }));
+      }
+      syncTilePickUI();
+      updateComfyPickBar();
+      return;
+    }
+    openViewer(p);
+  });
   tile.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      openViewer(p);
+      tile.click();
     }
   });
   return tile;
@@ -1463,12 +1534,55 @@ function postTile(p, opts) {
 
 /* ---------------- 大图 / 视频预览 ---------------- */
 
+function updateViewerComfyToggle() {
+  const btn = $("viewerComfyToggle");
+  if (!btn) return;
+  const v = state.viewer;
+  const cnt = (v.comfyFiles || []).length;
+  if (v.subMode === "comfy") {
+    btn.textContent = "← 返回主画廊";
+    btn.classList.add("is-comfy-picking");
+    btn.title = "返回当前 Post 的原图与视频主画廊";
+  } else {
+    btn.textContent = `工作流子画廊 (${cnt})`;
+    btn.classList.remove("is-comfy-picking");
+    btn.title = cnt ? `点此进入查看 ${cnt} 张工作流成品` : "点此进入工作流子画廊（可拖入图片）";
+  }
+}
+
+function setViewerSubMode(mode) {
+  const v = state.viewer;
+  const next = mode === "comfy" ? "comfy" : "main";
+  if (v.subMode === "main") v.mainIndex = v.index;
+  else v.comfyIndex = v.index;
+
+  v.subMode = next;
+  if (next === "comfy") {
+    v.files = v.comfyFiles;
+    v.index = v.files.length ? Math.min(v.comfyIndex, v.files.length - 1) : 0;
+  } else {
+    v.files = v.mainFiles;
+    v.index = v.files.length ? Math.min(v.mainIndex, v.files.length - 1) : 0;
+  }
+  updateViewerComfyToggle();
+  renderViewerThumbs();
+  renderViewerFrames();
+  renderViewerComfy();
+  showViewerFile();
+}
+
 function openViewer(post) {
-  state.viewer.post = post;
-  state.viewer.files = [...(post.files || []), ...(post.frames || [])];
-  state.viewer.index = 0;
-  state.viewer.title = post.title;
-  state.viewer.creator = post.creator
+  const v = state.viewer;
+  v.post = post;
+  v.mainFiles = [...(post.files || []), ...(post.frames || [])];
+  v.comfyFiles = [...(post.comfy || [])];
+  v.subMode = "main";
+  v.mainIndex = 0;
+  v.comfyIndex = 0;
+  v.files = v.mainFiles;
+  v.index = 0;
+  v.title = post.title;
+  v.creator = post.creator
     ? (post.creator.nickname || post.creator.folder || "")
     : "";
   $("viewerTitle").textContent = post.title || "";
@@ -1477,15 +1591,76 @@ function openViewer(post) {
     post.type,
     (post.time || "").slice(0, 16),
   ].filter(Boolean).join(" · ");
+  updateViewerComfyToggle();
+  renderViewerThumbs();
   renderViewerFrames();
+  renderViewerComfy();
   showViewerFile();
   $("viewer").showModal();
+}
+
+function renderViewerThumbs() {
+  const bar = $("viewerThumbs");
+  const jump = $("viewerJump");
+  const v = state.viewer;
+  const files = v.files || [];
+  if (jump) {
+    jump.innerHTML = "";
+    if (files.length > 1) {
+      jump.hidden = false;
+      files.forEach((f, i) => {
+        const opt = document.createElement("option");
+        opt.value = String(i);
+        const tag = f.is_comfy ? "工作流" : (f.is_frame ? "截图" : (f.kind === "video" ? "视频" : "图片"));
+        opt.textContent = `第 ${i + 1} / ${files.length} 个 (${tag})`;
+        jump.append(opt);
+      });
+      jump.value = String(v.index);
+    } else {
+      jump.hidden = true;
+    }
+  }
+  if (!bar) return;
+  bar.innerHTML = "";
+  if (v.subMode !== "main" || files.length <= 1) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  files.forEach((file, idx) => {
+    const btn = mk("button", "viewer-thumb-btn");
+    btn.type = "button";
+    btn.dataset.idx = String(idx);
+    btn.title = `第 ${idx + 1} 个：${file.name || ""}`;
+    if (idx === v.index) btn.classList.add("is-active");
+    if (file.kind === "video") {
+      const box = mk("span", "viewer-thumb-video", "视频");
+      btn.append(box);
+    } else {
+      const img = document.createElement("img");
+      img.src = thumbURL(file.path, 120, file.mtime || file.size || "");
+      img.alt = "";
+      img.draggable = false;
+      btn.append(img);
+    }
+    btn.append(mk("span", "viewer-thumb-num", String(idx + 1)));
+    btn.addEventListener("click", () => {
+      v.index = idx;
+      showViewerFile();
+    });
+    bar.append(btn);
+  });
 }
 
 function renderViewerFrames() {
   const box = $("viewerFrames");
   if (!box) return;
   const v = state.viewer;
+  if (v.subMode !== "main") {
+    box.innerHTML = "";
+    box.hidden = true;
+    return;
+  }
   const frames = [];
   v.files.forEach((f, idx) => {
     if (f && f.is_frame) frames.push({ file: f, idx });
@@ -1504,7 +1679,7 @@ function renderViewerFrames() {
     btn.dataset.idx = String(idx);
     if (idx === v.index) btn.classList.add("is-active");
     const img = document.createElement("img");
-    img.src = thumbURL(file.path, 160);
+    img.src = thumbURL(file.path, 160, file.mtime || file.size || "");
     img.alt = file.name || "";
     img.draggable = false;
     btn.append(img);
@@ -1518,12 +1693,72 @@ function renderViewerFrames() {
 }
 
 function syncViewerFramesActive() {
-  const box = $("viewerFrames");
-  if (!box || box.hidden) return;
   const cur = String(state.viewer.index);
-  box.querySelectorAll(".viewer-frame-thumb").forEach((btn) => {
-    btn.classList.toggle("is-active", btn.dataset.idx === cur);
+  const tbar = $("viewerThumbs");
+  if (tbar && !tbar.hidden) {
+    tbar.querySelectorAll(".viewer-thumb-btn").forEach((btn) => {
+      const on = btn.dataset.idx === cur;
+      btn.classList.toggle("is-active", on);
+      if (on) btn.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+  const jump = $("viewerJump");
+  if (jump && !jump.hidden) jump.value = cur;
+  const box = $("viewerFrames");
+  if (box && !box.hidden) {
+    box.querySelectorAll(".viewer-frame-thumb").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.idx === cur);
+    });
+  }
+  const cbox = $("viewerComfy");
+  if (cbox && !cbox.hidden) {
+    cbox.querySelectorAll(".viewer-comfy-thumb").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.idx === cur);
+    });
+  }
+}
+
+function renderViewerComfy() {
+  const box = $("viewerComfy");
+  if (!box) return;
+  const v = state.viewer;
+  box.innerHTML = "";
+  if (v.subMode !== "comfy") {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  const outputs = v.comfyFiles || [];
+  const head = mk("div", "viewer-comfy-head");
+  head.append(mk("span", "viewer-comfy-title", `工作流子画廊 (${outputs.length})`));
+  head.append(mk("span", "viewer-comfy-sub", "可直接拖入图片至此，或点击缩略图查看/拖出"));
+  box.append(head);
+
+  if (!outputs.length) {
+    box.append(mk("div", "viewer-comfy-empty", "当前作品还没有工作流成品。把图片拖到这里，会自动按当前主画廊照片规范命名并归入。"));
+    return;
+  }
+
+  const strip = mk("div", "viewer-comfy-strip");
+  outputs.forEach((file, idx) => {
+    const btn = mk("button", "viewer-comfy-thumb");
+    btn.type = "button";
+    btn.title = `${file.name || "工作流成品"}（点击查看，可直接拖出）`;
+    btn.dataset.idx = String(idx);
+    if (idx === v.index) btn.classList.add("is-active");
+    const img = document.createElement("img");
+    img.src = thumbURL(file.path, 160, file.mtime || file.size || "");
+    img.alt = file.name || "";
+    img.draggable = false;
+    btn.append(img);
+    attachAssetDrag(btn, file, { dragImageEl: () => img });
+    btn.addEventListener("click", () => {
+      v.index = idx;
+      showViewerFile();
+    });
+    strip.append(btn);
   });
+  box.append(strip);
 }
 
 function updateViewerDeleteButtons() {
@@ -1532,12 +1767,38 @@ function updateViewerDeleteButtons() {
   const delOne = $("viewerDeleteOne");
   const delAll = $("viewerDelete");
   if (!delOne || !delAll) return;
-  const multi = v.files.length > 1 && !!f;
+  const n = v.files.length;
+  if (v.subMode === "comfy") {
+    if (!n) {
+      delOne.hidden = true;
+      delAll.hidden = true;
+      return;
+    }
+    delAll.hidden = false;
+    if (n > 1 && f) {
+      delOne.hidden = false;
+      delOne.textContent = "删这张成品";
+      delAll.textContent = `清空成品 (${n})`;
+      delAll.title = `把当前作品的全部 ${n} 张工作流成品移到回收站`;
+    } else {
+      delOne.hidden = true;
+      delAll.textContent = "删除这张成品";
+      delAll.title = "把这张工作流成品移到回收站";
+    }
+    return;
+  }
+  if (!n) {
+    delOne.hidden = true;
+    delAll.hidden = true;
+    return;
+  }
+  delAll.hidden = false;
+  const multi = n > 1 && !!f;
   delOne.hidden = !multi;
   if (multi) {
     delOne.textContent = f.is_frame ? "删这张截图" : (f.kind === "video" ? "删当前视频" : "删这一张");
-    delAll.textContent = `删整条 (${v.files.length})`;
-    delAll.title = `把这条作品的全部 ${v.files.length} 个文件移到回收站`;
+    delAll.textContent = `删整条 (${n})`;
+    delAll.title = `把这条作品的全部 ${n} 个文件移到回收站`;
   } else {
     delAll.textContent = "移到回收站";
     delAll.title = "把这条作品的文件移到回收站";
@@ -1547,7 +1808,7 @@ function updateViewerDeleteButtons() {
 function appendViewerFrame(r) {
   const v = state.viewer;
   if (!r || !r.path) return;
-  const item = { name: r.name || "", path: r.path, kind: "image", is_frame: true };
+  const item = { name: r.name || "", path: r.path, kind: "image", is_frame: true, mtime: r.mtime || Date.now() };
   if (v.post) {
     if (!Array.isArray(v.post.frames)) v.post.frames = [];
     v.post.frames.push(item);
@@ -1556,6 +1817,7 @@ function appendViewerFrame(r) {
   $("viewerCount").textContent = v.files.length ? `${v.index + 1} / ${v.files.length}` : "";
   $("viewerPrev").hidden = v.files.length < 2;
   $("viewerNext").hidden = v.files.length < 2;
+  renderViewerThumbs();
   renderViewerFrames();
   updateViewerDeleteButtons();
 }
@@ -1582,14 +1844,21 @@ function showViewerFile() {
   $("viewerExtract").disabled = false;
   $("viewerExtract").textContent = "抽这一帧";
   const f = v.files[v.index];
+  syncViewerComfyBtn(f);
   $("viewerCount").textContent = v.files.length ? `${v.index + 1} / ${v.files.length}` : "";
   $("viewerPrev").hidden = v.files.length < 2;
   $("viewerNext").hidden = v.files.length < 2;
   syncViewerFramesActive();
   updateViewerDeleteButtons();
-  if (!f) return;
+  if (!f) {
+    if (v.subMode === "comfy") {
+      stage.append(mk("div", "empty", "当前作品还没有工作流成品；把图片拖到这里即可归入。"));
+    }
+    return;
+  }
 
-  const src = "/api/asset?path=" + encodeURIComponent(f.path);
+  const ver = f.mtime || (f.is_comfy ? Date.now() : "");
+  const src = "/api/asset?path=" + encodeURIComponent(f.path) + (ver ? "&v=" + encodeURIComponent(String(ver)) : "");
   if (f.kind === "video") {
     const vid = document.createElement("video");
     vid.src = src;
@@ -1626,6 +1895,16 @@ function showViewerFile() {
   }
 }
 
+$("viewerComfyToggle")?.addEventListener("click", () => {
+  setViewerSubMode(state.viewer.subMode === "comfy" ? "main" : "comfy");
+});
+$("viewerJump")?.addEventListener("change", () => {
+  const v = state.viewer;
+  const idx = Number($("viewerJump").value);
+  if (!Number.isFinite(idx) || idx < 0 || idx >= v.files.length) return;
+  v.index = idx;
+  showViewerFile();
+});
 $("viewerClose").addEventListener("click", () => {
   $("viewer").close();
 });
@@ -1646,8 +1925,10 @@ $("viewerNext").addEventListener("click", () => {
   showViewerFile();
 });
 $("viewerOpen").addEventListener("click", () => {
-  const f = state.viewer.files[state.viewer.index];
+  const v = state.viewer;
+  const f = v.files[v.index] || v.mainFiles[v.mainIndex] || v.mainFiles[0];
   if (f) openFolder(folderOf(f.path));
+  else showToast("没有可打开的文件夹");
 });
 
 $("viewerDeleteOne").addEventListener("click", async () => {
@@ -1664,9 +1945,12 @@ $("viewerDeleteOne").addEventListener("click", async () => {
       showToast(r.message || "删除失败");
       return;
     }
+    removeComfyPickedPaths([f.path]);
     v.files.splice(v.index, 1);
     if (v.post) {
-      if (f.is_frame && Array.isArray(v.post.frames)) {
+      if (f.is_comfy && Array.isArray(v.post.comfy)) {
+        v.post.comfy = v.post.comfy.filter((x) => x.path !== f.path);
+      } else if (f.is_frame && Array.isArray(v.post.frames)) {
         v.post.frames = v.post.frames.filter((x) => x.path !== f.path);
       } else if (Array.isArray(v.post.files)) {
         v.post.files = v.post.files.filter((x) => x.path !== f.path);
@@ -1681,12 +1965,15 @@ $("viewerDeleteOne").addEventListener("click", async () => {
     state.gallery.dirty = true;
     if (state.view === "gallery") loadGallery(true);
     if (state.view === "creator" && state.lib.key) refreshLibrary(true);
-    if (!v.files.length) {
+    if (!v.files.length && v.subMode === "main") {
       $("viewer").close();
       return;
     }
-    if (v.index >= v.files.length) v.index = v.files.length - 1;
+    if (v.index >= v.files.length) v.index = Math.max(0, v.files.length - 1);
+    updateViewerComfyToggle();
+    renderViewerThumbs();
     renderViewerFrames();
+    renderViewerComfy();
     showViewerFile();
   } catch (e) {
     showToast("删除失败：" + e.message);
@@ -1699,21 +1986,38 @@ $("viewerDelete").addEventListener("click", async () => {
   const v = state.viewer;
   if (!v.files.length) return;
   const n = v.files.length;
+  const isComfyMode = v.subMode === "comfy";
+  const delPaths = v.files.map((f) => f.path);
   const label = v.title ? `「${v.title}」` : "这条作品";
-  if (!window.confirm(`把${label}（${n} 个文件）移到回收站？`)) return;
+  const msg = isComfyMode
+    ? (n === 1 ? "把这张工作流成品移到回收站？" : `清空当前作品的全部 ${n} 张工作流成品（移到回收站）？`)
+    : `把${label}（${n} 个文件）移到回收站？`;
+  if (!window.confirm(msg)) return;
   const btn = $("viewerDelete");
   btn.disabled = true;
   try {
-    const r = await api("/api/post/delete", { paths: v.files.map((f) => f.path) });
+    const r = await api("/api/post/delete", { paths: delPaths });
     if (!r.ok) {
       showToast(r.message || "删除失败");
       return;
     }
-    $("viewer").close();
-    showToast(`已将 ${r.deleted || n} 个文件移到回收站`);
+    removeComfyPickedPaths(delPaths);
     state.gallery.dirty = true;
     if (state.view === "gallery") loadGallery(true);
     if (state.view === "creator" && state.lib.key) refreshLibrary(true);
+    if (isComfyMode) {
+      v.comfyFiles.length = 0;
+      if (v.post) v.post.comfy = [];
+      v.index = 0;
+      showToast(`已将 ${r.deleted || n} 张工作流成品移到回收站`);
+      updateViewerComfyToggle();
+      renderViewerThumbs();
+      renderViewerComfy();
+      showViewerFile();
+    } else {
+      $("viewer").close();
+      showToast(`已将 ${r.deleted || n} 个文件移到回收站`);
+    }
   } catch (e) {
     showToast("删除失败：" + e.message);
   } finally {
@@ -2016,6 +2320,11 @@ function setView(view) {
   document.querySelectorAll(".nav-item").forEach((b) => {
     b.classList.toggle("is-on", b.dataset.view === navKey);
   });
+  const rail = $("appRail");
+  if (rail && rail.classList.contains("is-open")) {
+    rail.classList.remove("is-open");
+    $("mobileMenuBtn")?.setAttribute("aria-expanded", "false");
+  }
   $("viewGallery").hidden = view !== "gallery";
   $("viewCreator").hidden = view !== "creator";
   $("viewDiscover").hidden = view !== "discover";
@@ -2674,7 +2983,7 @@ function fxPaintSeek() {
   const max = parseFloat(seek.max) || 1;
   const p = fxClamp((parseFloat(seek.value) || 0) / max, 0, 1) * 100;
   seek.style.background =
-    "linear-gradient(to right, var(--copper) 0%, var(--copper) " + p +
+    "linear-gradient(to right, var(--copper) 0%, var(--copper) " + p + /* taste-skill-ignore */
     "%, var(--line-2) " + p + "%, var(--line-2) 100%)";
 }
 
@@ -3340,6 +3649,13 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
   btn.addEventListener("click", () => setView(btn.dataset.view));
 });
 
+$("mobileMenuBtn")?.addEventListener("click", () => {
+  const rail = $("appRail");
+  if (!rail) return;
+  const open = rail.classList.toggle("is-open");
+  $("mobileMenuBtn")?.setAttribute("aria-expanded", open ? "true" : "false");
+});
+
 $("toLive").addEventListener("click", () => {
   state.tool = "live";
   setView("tools");
@@ -3546,7 +3862,7 @@ function renderXhsDiscover() {
     <article class="discover-card">
       <div class="discover-cover-wrap">
         <img class="discover-cover" src="${escapeHtml(proxyImg(it.cover))}" loading="lazy" alt="">
-        <button class="discover-dismiss" data-dxhs-hide="${idx}" type="button" title="不看这条">×</button>
+        <button class="discover-dismiss" data-dxhs-hide="${idx}" type="button" title="不看这条" aria-label="不看这条"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
         <span class="discover-badge">${escapeHtml(it.type || "图文")}</span>
       </div>
       <div class="discover-body">
@@ -3554,7 +3870,7 @@ function renderXhsDiscover() {
         <div class="discover-author">
           ${it.avatar ? `<img class="discover-avatar" src="${escapeHtml(proxyImg(it.avatar))}" loading="lazy" alt="">` : ""}
           <span class="discover-nick">${escapeHtml(it.nickname || "小红书用户")}</span>
-          <span class="discover-likes">♥ ${escapeHtml(it.liked_count || "0")}</span>
+          <span class="discover-likes"><svg class="discover-like-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 13.5S2.2 9.9 2.2 5.7A3.2 3.2 0 0 1 8 3.8a3.2 3.2 0 0 1 5.8 1.9c0 4.2-5.8 7.8-5.8 7.8z"/></svg>${escapeHtml(it.liked_count || "0")}</span>
         </div>
         <div class="discover-actions">
           <button class="mini" data-dxhs-user="${idx}" type="button">看Ta主页</button>
@@ -3630,14 +3946,14 @@ function renderDyDiscover() {
     <article class="discover-card">
       <div class="discover-cover-wrap">
         <img class="discover-cover" src="${escapeHtml(proxyImg(it.cover))}" loading="lazy" alt="">
-        <button class="discover-dismiss" data-ddy-hide="${idx}" type="button" title="不看这条">×</button>
+        <button class="discover-dismiss" data-ddy-hide="${idx}" type="button" title="不看这条" aria-label="不看这条"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
         <span class="discover-badge">${escapeHtml(it.type || "视频")}</span>
       </div>
       <div class="discover-body">
         <h3 class="discover-title">${escapeHtml(it.title || it.desc || "无标题")}</h3>
         <div class="discover-author">
           <span class="discover-nick">${escapeHtml(it.nickname || "抖音博主")}</span>
-          <span class="discover-likes">♥ ${escapeHtml(fmtCount(it.liked_count || 0))}</span>
+          <span class="discover-likes"><svg class="discover-like-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 13.5S2.2 9.9 2.2 5.7A3.2 3.2 0 0 1 8 3.8a3.2 3.2 0 0 1 5.8 1.9c0 4.2-5.8 7.8-5.8 7.8z"/></svg>${escapeHtml(fmtCount(it.liked_count || 0))}</span>
         </div>
         <div class="discover-actions">
           <button class="mini" data-ddy-user="${idx}" type="button">看Ta主页</button>
@@ -3694,12 +4010,12 @@ async function loadDouyinBeautyFeed(reset) {
   }
 }
 
-document.querySelectorAll("#discoverPlatformTabs .mode").forEach((btn) => {
+document.querySelectorAll("#discoverPlatformTabs [data-dplat]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const plat = btn.dataset.dplat;
     state.discover.platform = plat;
     $("discoverUserPane").hidden = true;
-    document.querySelectorAll("#discoverPlatformTabs .mode").forEach((b) => {
+    document.querySelectorAll("#discoverPlatformTabs [data-dplat]").forEach((b) => {
       const on = b.dataset.dplat === plat;
       b.classList.toggle("is-on", on);
       b.setAttribute("aria-selected", on ? "true" : "false");
@@ -4208,5 +4524,472 @@ $("discoverUserGrid").addEventListener("click", async (e) => {
         dlBtn.disabled = false;
       }
     }
+  }
+});
+
+/* ---------------- ComfyUI 画廊批量处理联动 ---------------- */
+
+const COMFY_IMG_RE = /\.(png|jpe?g|webp|bmp)$/i;
+
+function extractPostImages(post) {
+  const out = [];
+  const seen = new Set();
+  for (const list of [post.files || [], post.frames || []]) {
+    for (const f of list) {
+      if (!f || !f.path || seen.has(f.path)) continue;
+      if (f.kind !== "video" && COMFY_IMG_RE.test(f.name || f.path)) {
+        seen.add(f.path);
+        out.push(f);
+      }
+    }
+  }
+  return out;
+}
+
+function syncAllPickTiles() {
+  document.querySelectorAll(".post").forEach((el) => {
+    if (typeof el._syncPickUI === "function") el._syncPickUI();
+  });
+}
+
+function updateComfyPickBar() {
+  const cnt = state.comfy.files.size;
+  const on = state.comfy.pickMode;
+  document.body.classList.toggle("is-pick-active", on);
+  $("galPickModeBtn").classList.toggle("is-comfy-picking", on);
+  $("libPickModeBtn").classList.toggle("is-comfy-picking", on);
+  $("galPickModeBtn").textContent = on ? "完成选图" : "批量选图";
+  $("libPickModeBtn").textContent = on ? "完成选图" : "批量选图";
+  $("comfyPickCount").textContent = `已选 ${cnt} 张图片`;
+  $("comfyPickBar").hidden = !on && cnt === 0;
+}
+
+function toggleComfyPickMode(force) {
+  state.comfy.pickMode = typeof force === "boolean" ? force : !state.comfy.pickMode;
+  updateComfyPickBar();
+  syncAllPickTiles();
+}
+
+function removeComfyPickedPaths(paths) {
+  if (!Array.isArray(paths) || !paths.length) return;
+  let changed = false;
+  for (const p of paths) {
+    if (state.comfy.files.delete(p)) changed = true;
+  }
+  if (changed) {
+    updateComfyPickBar();
+    syncAllPickTiles();
+    if ($("comfyDialog")?.open) renderComfyDialogThumbs();
+  }
+}
+
+function syncViewerComfyBtn(f) {
+  const btn = $("viewerAddComfy");
+  if (!f || f.kind === "video" || !COMFY_IMG_RE.test(f.name || f.path)) {
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+  const added = state.comfy.files.has(f.path);
+  btn.textContent = added ? "已加入批处理" : "加入批处理";
+  btn.classList.toggle("is-comfy-picking", added);
+}
+
+$("galPickModeBtn").addEventListener("click", () => toggleComfyPickMode());
+$("libPickModeBtn").addEventListener("click", () => toggleComfyPickMode());
+
+$("viewerAddComfy").addEventListener("click", () => {
+  const f = state.viewer.files[state.viewer.index];
+  if (!f) return;
+  if (state.comfy.files.has(f.path)) {
+    state.comfy.files.delete(f.path);
+    showToast("已从批处理列表移除");
+  } else {
+    state.comfy.files.set(f.path, { path: f.path, name: f.name || f.path, mtime: f.mtime || f.size || "" });
+    showToast("已加入批处理列表");
+  }
+  syncViewerComfyBtn(f);
+  updateComfyPickBar();
+  syncAllPickTiles();
+});
+
+$("comfyPickClear").addEventListener("click", () => {
+  state.comfy.files.clear();
+  updateComfyPickBar();
+  syncAllPickTiles();
+  renderComfyDialogThumbs();
+});
+
+$("comfyPickExit").addEventListener("click", () => toggleComfyPickMode(false));
+
+function renderComfyDialogThumbs() {
+  const strip = $("comfyThumbStrip");
+  strip.innerHTML = "";
+  const items = Array.from(state.comfy.files.values());
+  $("comfyDlgCount").textContent = `已选 ${items.length} 张图片`;
+  if (!items.length) {
+    strip.append(mk("span", "meta", "暂未选择图片，可先在画廊开启「批量选图」点击作品，或在大图预览点「加入批处理」。"));
+    return;
+  }
+  for (const item of items) {
+    const box = mk("div", "comfy-thumb-item");
+    box.title = item.name;
+    const img = document.createElement("img");
+    img.src = thumbURL(item.path, 120, item.mtime || item.size || "");
+    img.alt = item.name;
+    const rm = mk("button", "comfy-thumb-rm");
+    rm.type = "button";
+    rm.title = "移除这张";
+    rm.setAttribute("aria-label", "移除这张");
+    rm.innerHTML = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>';
+    rm.addEventListener("click", () => {
+      state.comfy.files.delete(item.path);
+      renderComfyDialogThumbs();
+      updateComfyPickBar();
+      syncAllPickTiles();
+    });
+    box.append(img, rm);
+    strip.append(box);
+  }
+}
+
+async function pollComfyStatus() {
+  try {
+    const srv = encodeURIComponent($("comfyServer").value.trim());
+    const r = await api(`/api/comfy/status?server=${srv}`);
+    if (!r.ok) return;
+
+    if (!$("comfyWorkflow").value.trim() && r.workflow) $("comfyWorkflow").value = r.workflow;
+    if (!$("comfyPrefix").value.trim() && r.prefix) $("comfyPrefix").value = r.prefix;
+    if (!state.comfy.promptDirty && !$("comfyPrompt").value.trim()) {
+      $("comfyPrompt").value = r.prompt || r.default_prompt || "";
+    }
+
+    const total = r.total || 0;
+    const done = r.done || 0;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    $("comfyProgFill").style.width = `${pct}%`;
+
+    const busy = r.running || (r.queue_running || 0) > 0 || (r.queue_pending || 0) > 0;
+    $("comfyStartBtn").disabled = busy;
+    $("comfyStopBtn").hidden = !r.running;
+
+    const wasRunning = !!state.comfy.wasRunning;
+    state.comfy.wasRunning = !!r.running;
+
+    if (r.running) {
+      $("comfyStatusText").textContent = `正在处理 [${done}/${total}]：${r.current_file || "..."}`;
+    } else if (!r.comfy_online) {
+      $("comfyStatusText").textContent = "未检测到 ComfyUI 服务（请确认已启动且端口为 8188）";
+    } else if ((r.queue_running || 0) > 0 || (r.queue_pending || 0) > 0) {
+      $("comfyStatusText").textContent = `ComfyUI 正在执行其他任务（运行中 ${r.queue_running} / 排队中 ${r.queue_pending}），请等待空闲`;
+    } else if (r.error) {
+      $("comfyStatusText").textContent = `上次运行出错：${r.error}`;
+    } else if (total > 0 && done === total) {
+      $("comfyStatusText").textContent = `全部完成！共 ${total} 张，已归入对应作品的「工作流子画廊」`;
+    } else {
+      $("comfyStatusText").textContent = `ComfyUI 已连接，就绪（已选 ${state.comfy.files.size} 张）`;
+    }
+
+    if (wasRunning && !r.running && done > 0) {
+      state.gallery.dirty = true;
+      if (state.view === "gallery") loadGallery(true);
+      if (state.view === "creator" && state.lib.key) refreshLibrary(true);
+    }
+
+    const logEl = $("comfyLog");
+    logEl.textContent = (r.logs || []).join("\n");
+    logEl.scrollTop = logEl.scrollHeight;
+  } catch (_) {}
+}
+
+function startComfyPoll() {
+  stopComfyPoll();
+  pollComfyStatus();
+  state.comfy.pollTimer = setInterval(pollComfyStatus, 1500);
+}
+
+function stopComfyPoll() {
+  if (state.comfy.pollTimer) {
+    clearInterval(state.comfy.pollTimer);
+    state.comfy.pollTimer = null;
+  }
+}
+
+$("comfyPrompt").addEventListener("input", () => {
+  state.comfy.promptDirty = true;
+});
+
+function renderComfyPresets(selectedName = "") {
+  const sel = $("comfyPresetSelect");
+  sel.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = state.comfy.presets.length ? "选择提示词预设…" : "暂无预设（可点右侧存为预设）";
+  sel.append(opt0);
+  for (const p of state.comfy.presets) {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.name;
+    sel.append(opt);
+  }
+  if (selectedName) sel.value = selectedName;
+}
+
+async function loadComfyPresets(selectedName = "") {
+  try {
+    const r = await api("/api/comfy/presets");
+    if (r.ok && Array.isArray(r.presets)) {
+      state.comfy.presets = r.presets;
+      renderComfyPresets(selectedName);
+    }
+  } catch (_) {}
+}
+
+$("comfyPresetSelect").addEventListener("change", () => {
+  const name = $("comfyPresetSelect").value;
+  const hit = state.comfy.presets.find((x) => x.name === name);
+  if (hit) {
+    $("comfyPrompt").value = hit.prompt;
+    state.comfy.promptDirty = true;
+    showToast(`已切换预设：${hit.name}`);
+  }
+});
+
+$("comfyPresetSaveBtn").addEventListener("click", async () => {
+  const promptVal = $("comfyPrompt").value.trim();
+  if (!promptVal) {
+    showToast("提示词为空，无法保存预设");
+    return;
+  }
+  const curName = $("comfyPresetSelect").value || "";
+  const name = window.prompt("输入预设名称（同名会覆盖更新）：", curName);
+  if (!name || !name.trim()) return;
+  const r = await api("/api/comfy/presets/save", { name: name.trim(), prompt: promptVal });
+  if (!r.ok) {
+    showToast(r.message || "保存预设失败");
+    return;
+  }
+  state.comfy.presets = r.presets || [];
+  renderComfyPresets(name.trim());
+  showToast(`已保存预设：${name.trim()}`);
+});
+
+$("comfyPresetDelBtn").addEventListener("click", async () => {
+  const name = $("comfyPresetSelect").value;
+  if (!name) {
+    showToast("请先在下拉框选中要删除的预设");
+    return;
+  }
+  if (!window.confirm(`确定删除预设「${name}」吗？`)) return;
+  const r = await api("/api/comfy/presets/delete", { name });
+  if (!r.ok) {
+    showToast(r.message || "删除预设失败");
+    return;
+  }
+  state.comfy.presets = r.presets || [];
+  renderComfyPresets("");
+  showToast(`已删除预设：${name}`);
+});
+
+function hasExternalFiles(ev) {
+  const dt = ev && ev.dataTransfer;
+  return !!(dt && Array.from(dt.types || []).includes("Files"));
+}
+
+async function importComfyFilesToTarget(targetPath, fileList, onEachSaved) {
+  if (!targetPath) {
+    showToast("当前作品没有可用的基准文件");
+    return;
+  }
+  const files = Array.from(fileList || []).filter((f) => (
+    f && (COMFY_IMG_RE.test(f.name || "") || /^image\/(png|jpeg|webp|bmp)$/i.test(f.type || ""))
+  ));
+  if (!files.length) {
+    showToast("请拖入 PNG / JPG / WEBP / BMP 格式的图片");
+    return;
+  }
+  let okCount = 0;
+  let renamedCount = 0;
+  let lastFile = null;
+  for (const file of files) {
+    const qs = new URLSearchParams({
+      target: targetPath,
+      filename: file.name || "image.png",
+    });
+    try {
+      const resp = await fetch("/api/comfy/import?" + qs.toString(), {
+        method: "POST",
+        body: file,
+      });
+      const r = await resp.json();
+      if (!r.ok || !r.file) {
+        showToast(r.message || `导入 ${file.name} 失败`);
+        continue;
+      }
+      okCount += 1;
+      if (r.renamed) renamedCount += 1;
+      lastFile = r.file;
+      if (typeof onEachSaved === "function") onEachSaved(r);
+    } catch (e) {
+      showToast(`导入失败：${e.message}`);
+    }
+  }
+  if (!okCount) return;
+  state.gallery.dirty = true;
+  if (state.view === "gallery") loadGallery(true);
+  if (state.view === "creator" && state.lib.key) refreshLibrary(true);
+  let renameTip = "";
+  if (renamedCount === 1 && okCount === 1 && lastFile) {
+    renameTip = `（命名不符已自动改为 ${lastFile.name}）`;
+  } else if (renamedCount > 0) {
+    renameTip = `（其中 ${renamedCount} 张命名不符已自动规范化）`;
+  }
+  showToast(`已将 ${okCount} 张工作流成品归入子画廊${renameTip}`);
+}
+
+function attachComfyDrop(el, getTargetPath, opts) {
+  if (!el) return;
+  const o = opts || {};
+  let dragDepth = 0;
+  el.addEventListener("dragenter", (e) => {
+    if (!hasExternalFiles(e)) return;
+    e.preventDefault();
+    dragDepth += 1;
+    el.classList.add("is-drop-target");
+  });
+  el.addEventListener("dragover", (e) => {
+    if (!hasExternalFiles(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    el.classList.add("is-drop-target");
+  });
+  el.addEventListener("dragleave", () => {
+    if (dragDepth > 0) dragDepth -= 1;
+    if (dragDepth === 0) el.classList.remove("is-drop-target");
+  });
+  el.addEventListener("drop", async (e) => {
+    if (!hasExternalFiles(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth = 0;
+    el.classList.remove("is-drop-target");
+    const targetPath = typeof getTargetPath === "function" ? getTargetPath() : "";
+    await importComfyFilesToTarget(targetPath, e.dataTransfer.files, o.onImported);
+  });
+}
+
+attachComfyDrop($("viewerStage"), () => {
+  const v = state.viewer;
+  const cur = v.subMode === "main"
+    ? (v.files[v.index] || v.mainFiles[0])
+    : (v.mainFiles[v.mainIndex] || v.mainFiles[0]);
+  return cur ? cur.path : "";
+}, {
+  onImported: (res) => {
+    const v = state.viewer;
+    if (!res || !res.file) return;
+    if (v.post) {
+      if (!Array.isArray(v.post.comfy)) v.post.comfy = [];
+      v.post.comfy.push(res.file);
+    }
+    v.comfyFiles.push(res.file);
+    updateViewerComfyToggle();
+    if (v.subMode === "comfy") {
+      v.index = v.comfyFiles.length - 1;
+      renderViewerThumbs();
+      renderViewerComfy();
+      showViewerFile();
+    }
+  },
+});
+
+attachComfyDrop($("viewerComfy"), () => {
+  const v = state.viewer;
+  const cur = v.mainFiles[v.mainIndex] || v.mainFiles[0];
+  return cur ? cur.path : "";
+}, {
+  onImported: (res) => {
+    const v = state.viewer;
+    if (!res || !res.file) return;
+    if (v.post) {
+      if (!Array.isArray(v.post.comfy)) v.post.comfy = [];
+      v.post.comfy.push(res.file);
+    }
+    v.comfyFiles.push(res.file);
+    updateViewerComfyToggle();
+    if (v.subMode === "comfy") {
+      v.index = v.comfyFiles.length - 1;
+      renderViewerThumbs();
+      renderViewerComfy();
+      showViewerFile();
+    }
+  },
+});
+
+$("viewer").addEventListener("dragover", (e) => {
+  if (!hasExternalFiles(e)) return;
+  e.preventDefault();
+});
+$("viewer").addEventListener("drop", (e) => {
+  if (!hasExternalFiles(e)) return;
+  e.preventDefault();
+});
+
+$("comfyOpenDialog").addEventListener("click", () => {
+  renderComfyDialogThumbs();
+  loadComfyPresets($("comfyPresetSelect").value);
+  $("comfyDialog").showModal();
+  startComfyPoll();
+});
+
+$("comfyDlgClear").addEventListener("click", () => {
+  state.comfy.files.clear();
+  renderComfyDialogThumbs();
+  updateComfyPickBar();
+  syncAllPickTiles();
+});
+
+$("comfyDlgClose").addEventListener("click", () => {
+  stopComfyPoll();
+  $("comfyDialog").close();
+});
+
+$("comfyDialog").addEventListener("close", stopComfyPoll);
+
+$("comfyStartBtn").addEventListener("click", async () => {
+  const paths = Array.from(state.comfy.files.keys());
+  if (!paths.length) {
+    showToast("请先选择至少 1 张图片");
+    return;
+  }
+  $("comfyStartBtn").disabled = true;
+  try {
+    const r = await api("/api/comfy/start", {
+      paths,
+      workflow: $("comfyWorkflow").value.trim(),
+      server: $("comfyServer").value.trim(),
+      prefix: $("comfyPrefix").value.trim(),
+      prompt: $("comfyPrompt").value.trim(),
+    });
+    if (!r.ok) {
+      showToast(r.message || "启动失败");
+      pollComfyStatus();
+      return;
+    }
+    showToast(`已提交 ${r.total} 张图片到 ComfyUI 批处理`);
+    pollComfyStatus();
+  } catch (e) {
+    showToast("请求失败：" + e.message);
+    pollComfyStatus();
+  }
+});
+
+$("comfyStopBtn").addEventListener("click", async () => {
+  try {
+    const r = await api("/api/comfy/stop", {});
+    if (r.ok) showToast("已请求停止，当前图片跑完后停止");
+  } catch (e) {
+    showToast("停止失败：" + e.message);
   }
 });

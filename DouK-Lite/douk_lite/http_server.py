@@ -17,7 +17,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from douk_lite import config, douk_api, downloader, gallery, media, state, xhs_api
+from douk_lite import comfy_batch, config, douk_api, downloader, gallery, media, state, xhs_api
 
 _CLIENT_DISCONNECT = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
 
@@ -184,6 +184,31 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             config.get_logger().warning("保存截帧失败 %s: %s", src, exc)
             return self._json({"ok": False, "message": f"保存失败：{str(exc)[:220]}"})
+
+    def _save_comfy_import(self):
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            length = 0
+        if length <= 0:
+            return self._json({"ok": False, "message": "没有收到图片数据"})
+        if length > 64 * 1024 * 1024:
+            return self._json({"ok": False, "message": "图片超过 64 MB，无法导入"})
+        try:
+            data = self.rfile.read(length)
+        except Exception:
+            return self._json({"ok": False, "message": "读取图片数据失败，请重试"})
+        src = media.thumb_allowed((query.get("target") or [""])[0])
+        if not src or src.suffix.lower() not in config.IMAGE_EXT | config.VIDEO_EXT:
+            return self._json({"ok": False, "message": "目标作品文件不存在或不在保存目录内"})
+        filename = (query.get("filename") or ["image.png"])[0]
+        try:
+            res = comfy_batch.import_to_post_comfy(src, filename, data)
+            return self._json(res)
+        except Exception as exc:
+            config.get_logger().warning("导入工作流成品失败 %s: %s", src, exc)
+            return self._json({"ok": False, "message": f"导入失败：{str(exc)[:220]}"})
 
     def _serve_heic_preview(self, src):
         try:
@@ -413,6 +438,13 @@ class Handler(BaseHTTPRequestHandler):
                 refresh=(query.get("refresh") or [""])[0] == "1",
             ))
 
+        if path == "/api/comfy/status":
+            srv = (query.get("server") or [""])[0]
+            return self._json(comfy_batch.get_status(srv))
+
+        if path == "/api/comfy/presets":
+            return self._json({"ok": True, "presets": comfy_batch.list_presets()})
+
         if path == "/api/livephoto/scan":
             root = config.resolve_root((query.get("root") or [""])[0])
             return self._json(livephoto_scan_payload(root))
@@ -613,6 +645,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         if path == "/api/frame/save":
             return self._save_frame_upload()
+        if path == "/api/comfy/import":
+            return self._save_comfy_import()
         body = self._body()
 
         try:
@@ -791,7 +825,7 @@ class Handler(BaseHTTPRequestHandler):
                         parts = p.relative_to(active_root).parts
                         if len(parts) >= 2:
                             affected_folders.add(parts[0])
-                            if parts[0] == config.FRAME_DIR and len(parts) >= 3:
+                            if parts[0] in (config.FRAME_DIR, config.COMFY_DIR) and len(parts) >= 3:
                                 affected_folders.add(parts[1])
                         else:
                             affected_folders = None
@@ -920,6 +954,25 @@ class Handler(BaseHTTPRequestHandler):
                 except OSError:
                     pass
                 return self._json(open_folder(str(out)))
+
+            if path == "/api/comfy/start":
+                res = comfy_batch.start_batch(
+                    body.get("paths") or [],
+                    workflow=body.get("workflow") or "",
+                    server=body.get("server") or "",
+                    prefix=body.get("prefix") or "",
+                    prompt=body.get("prompt") or "",
+                )
+                return self._json(res)
+
+            if path == "/api/comfy/stop":
+                return self._json(comfy_batch.stop_batch())
+
+            if path == "/api/comfy/presets/save":
+                return self._json(comfy_batch.save_preset(body.get("name") or "", body.get("prompt") or ""))
+
+            if path == "/api/comfy/presets/delete":
+                return self._json(comfy_batch.delete_preset(body.get("name") or ""))
 
             if path == "/api/tidy":
                 cfg = config.load_config()
