@@ -962,6 +962,7 @@ class Handler(BaseHTTPRequestHandler):
                     server=body.get("server") or "",
                     prefix=body.get("prefix") or "",
                     prompt=body.get("prompt") or "",
+                    preset_name=body.get("preset_name") or "",
                 )
                 return self._json(res)
 

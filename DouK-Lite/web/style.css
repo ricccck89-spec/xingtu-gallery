@@ -2197,18 +2197,30 @@ dialog[open] { animation: rise 0.18s ease-out; }
 
 /* 大图 / 视频查看器 */
 
-dialog.viewer { width: min(1080px, calc(100% - 28px)); }
+dialog.viewer { width: min(1120px, calc(100% - 28px)); }
 
-.viewer-body { display: flex; flex-direction: column; max-height: min(88dvh, 900px); }
+.viewer-body { display: flex; flex-direction: column; height: min(88dvh, 900px); max-height: min(88dvh, 900px); }
 
 .viewer-head {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  padding: 18px 20px 12px;
+  padding: 14px 18px 12px;
   border-bottom: 1px solid var(--line);
 }
+
+.viewer-close-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  color: var(--muted);
+}
+.viewer-close-btn:hover { color: var(--ink); }
+.viewer-close-btn svg { width: 15px; height: 15px; }
 
 .viewer-id { min-width: 0; }
 
@@ -2222,26 +2234,27 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 }
 
 .viewer-stage {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 220px;
+  min-height: 200px;
   background: #0b0e0c;
   overflow: hidden;
 }
 
-.viewer-stage img { display: block; max-width: 100%; max-height: 70dvh; }
+.viewer-stage img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
 .viewer-stage img[draggable="true"] { cursor: grab; }
 .viewer-stage img[draggable="true"]:active { cursor: grabbing; }
-.viewer-stage video { display: block; max-width: 100%; max-height: 54dvh; background: #000; }
+.viewer-stage video { display: block; max-width: 100%; max-height: 100%; background: #000; }
 .viewer-stage .empty { padding: 40px 24px; border: 0; }
 
 .viewer-frames {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 6px 14px;
   border-top: 1px solid var(--line);
   background: rgba(11, 14, 12, 0.92);
   overflow-x: auto;
@@ -2252,8 +2265,8 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 .viewer-frame-thumb {
   position: relative;
   flex: none;
-  width: 64px;
-  height: 48px;
+  width: 56px;
+  height: 42px;
   padding: 0;
   border: 1.5px solid var(--line);
   border-radius: 6px;
@@ -2268,6 +2281,7 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 .viewer-frame-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 .viewer-comfy {
+  flex-shrink: 0;
   padding: 10px 18px 12px;
   border-top: 1px solid var(--line);
   background: var(--field);
@@ -2320,6 +2334,7 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 .viewer-comfy-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 .vf-strip {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2347,6 +2362,7 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 .vf-strip canvas:hover { opacity: 0.95; border-color: var(--line-2); }
 
 .vf-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2360,6 +2376,7 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 .vf-actions { display: flex; gap: 8px; margin-left: auto; }
 
 .viewer-thumbs {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2385,6 +2402,30 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 
 .viewer-thumb-btn:hover { border-color: rgba(224, 166, 75, 0.65); transform: translateY(-1px); }
 .viewer-thumb-btn.is-active { border-color: var(--copper-hi); box-shadow: 0 0 0 1px rgba(224, 166, 75, 0.45); }
+.viewer-thumb-btn.is-comfy-picked,
+.viewer-frame-thumb.is-comfy-picked,
+.viewer-comfy-thumb.is-comfy-picked {
+  border-color: var(--copper);
+  box-shadow: inset 0 0 0 1px rgba(224, 166, 75, 0.45);
+}
+.viewer-thumb-btn.is-comfy-picked::after,
+.viewer-frame-thumb.is-comfy-picked::after,
+.viewer-comfy-thumb.is-comfy-picked::after {
+  content: "✓";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--copper);
+  color: #141816;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
 
 .viewer-thumb-btn img {
   display: block;
@@ -2434,15 +2475,55 @@ dialog.viewer { width: min(1080px, calc(100% - 28px)); }
 }
 
 .viewer-foot {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 12px 20px 16px;
+  padding: 10px 18px 14px;
 }
 
 .viewer-foot .meta { min-width: 72px; text-align: center; }
+
+/* 右键上下文菜单 */
+
+.ctx-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 176px;
+  padding: 5px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.52);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ctx-menu[hidden] { display: none; }
+
+.ctx-item {
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ctx-item:hover { background: var(--field); }
+.ctx-item.is-danger { color: var(--danger); }
+.ctx-item.is-danger:hover { background: rgba(217, 108, 100, 0.12); }
+.ctx-sep { height: 1px; margin: 3px 6px; background: var(--line); }
 
 /* 发现作品预览弹窗 */
 

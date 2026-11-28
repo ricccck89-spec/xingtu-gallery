@@ -14,7 +14,7 @@ DIR_UID_RE = re.compile(r"^UID(\d+)_(.+)$")
 FOLDER_SUFFIX = "_发布作品"
 
 
-_COMFY_SUFFIX_RE = re.compile(r"(?:_comfy(?:_\d+)?|_\d{5}_?)+$", re.IGNORECASE)
+_COMFY_SUFFIX_RE = re.compile(r"(?:_comfy(?:_.*)?|_\d{5}_?)+$", re.IGNORECASE)
 
 
 def _strip_comfy_suffix(stem):

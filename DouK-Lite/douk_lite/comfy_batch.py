@@ -22,7 +22,8 @@ DEFAULT_WORKFLOW = r"E:\Download\▶▷Qwen2.1-Turbo-9步-编辑&扩图&移除&�
 DEFAULT_SERVER = "http://127.0.0.1:8188"
 DEFAULT_PREFIX = "QW21_batch"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
-_COMFY_SUFFIX_RE = re.compile(r"(?:_comfy(?:_\d+)?)+$", re.IGNORECASE)
+_COMFY_SUFFIX_RE = re.compile(r"_comfy(?:_.*)?$", re.IGNORECASE)
+_ILLEGAL_NAME_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f\s]+')
 PRESETS_FILE = Path(__file__).resolve().parent.parent / "cache" / "comfy_presets.json"
 
 LOAD_IMAGE_NODE_ID = "425"
@@ -138,6 +139,12 @@ def _normalize_server(server: str) -> str:
 def _base_stem(stem: str) -> str:
     stripped = _COMFY_SUFFIX_RE.sub("", stem or "")
     return stripped or (stem or "")
+
+
+def _safe_preset_tag(preset_name: str) -> str:
+    cleaned = _ILLEGAL_NAME_CHARS_RE.sub("_", (preset_name or "").strip())
+    cleaned = re.sub(r"_+", "_", cleaned).strip("._- ")
+    return cleaned[:40]
 
 
 def _detect_image_ext(data: bytes) -> str:
@@ -344,17 +351,24 @@ def import_to_post_comfy(target_path: Path, filename: str, data: bytes) -> dict:
     }
 
 
-def _save_output_to_post(src_path: Path, img_meta: dict, data: bytes) -> Path:
+def _save_output_to_post(
+    src_path: Path,
+    img_meta: dict,
+    data: bytes,
+    preset_name: str = "",
+) -> Path:
     dest_dir = _comfy_out_dir(src_path)
     dest_dir.mkdir(parents=True, exist_ok=True)
     ext = Path(img_meta.get("filename") or ".png").suffix.lower()
     if ext not in IMAGE_EXTS:
         ext = ".png"
     base_stem = _base_stem(src_path.stem)
-    candidate = dest_dir / f"{base_stem}_comfy{ext}"
+    tag = _safe_preset_tag(preset_name)
+    stem_prefix = f"{base_stem}_comfy_{tag}" if tag else f"{base_stem}_comfy"
+    candidate = dest_dir / f"{stem_prefix}{ext}"
     seq = 2
     while candidate.exists():
-        candidate = dest_dir / f"{base_stem}_comfy_{seq}{ext}"
+        candidate = dest_dir / f"{stem_prefix}_{seq}{ext}"
         seq += 1
     tmp = dest_dir / f".{candidate.name}.{uuid.uuid4().hex[:6]}.part"
     tmp.write_bytes(data)
@@ -392,6 +406,7 @@ def start_batch(
     server: str = "",
     prefix: str = "",
     prompt: str = "",
+    preset_name: str = "",
 ) -> dict:
     wf_path = Path((workflow or DEFAULT_WORKFLOW).strip())
     try:
@@ -443,7 +458,7 @@ def start_batch(
     try:
         threading.Thread(
             target=_worker,
-            args=(wf_path, valid_paths, srv, out_prefix, prompt_str),
+            args=(wf_path, valid_paths, srv, out_prefix, prompt_str, (preset_name or "").strip()),
             daemon=True,
         ).start()
     except Exception:
@@ -470,6 +485,7 @@ def _worker(
     server: str,
     prefix: str,
     prompt_str: str,
+    preset_name: str = "",
 ) -> None:
     try:
         base_wf = json.loads(wf_path.read_text(encoding="utf-8"))
@@ -510,7 +526,7 @@ def _worker(
             saved_names: list[str] = []
             for img_meta in out_images:
                 img_bytes = _download_output_image(server, img_meta)
-                saved_path = _save_output_to_post(img_path, img_meta, img_bytes)
+                saved_path = _save_output_to_post(img_path, img_meta, img_bytes, preset_name=preset_name)
                 saved_names.append(saved_path.name)
             state.invalidate_library()
 

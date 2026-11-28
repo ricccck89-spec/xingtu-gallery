@@ -1439,32 +1439,44 @@ function postTile(p, opts) {
     del.title = "移入回收站";
     del.setAttribute("aria-label", "移入回收站");
     del.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-    del.addEventListener("click", async (ev) => {
+    del.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      const n = p.files.length;
-      const label = p.title ? `「${p.title}」` : "这条作品";
-      if (!window.confirm(`把${label}（${n} 个文件）移到回收站？`)) return;
-      del.disabled = true;
-      try {
-        const delPaths = p.files.map((f) => f.path);
-        const r = await api("/api/post/delete", { paths: delPaths });
-        if (!r.ok) {
-          showToast(r.message || "删除失败");
-          return;
-        }
-        removeComfyPickedPaths(delPaths);
-        showToast(`已将 ${r.deleted || n} 个文件移到回收站`);
-        state.gallery.dirty = true;
-        if (state.view === "gallery") loadGallery(true);
-        if (state.view === "creator" && state.lib.key) refreshLibrary(true);
-      } catch (e) {
-        showToast("删除失败：" + e.message);
-      } finally {
-        del.disabled = false;
-      }
+      deletePostFiles(p, del);
     });
     cover.append(del);
   }
+
+  tile.addEventListener("contextmenu", (ev) => {
+    const refFile = pickPostDragFile(p) || (p.files && p.files[0]);
+    const items = [];
+    if (postImgs.length) {
+      const allPicked = postImgs.every((f) => state.comfy.files.has(f.path));
+      items.push({
+        label: allPicked
+          ? `移出批处理 (${postImgs.length} 张图)`
+          : `加入批处理 (${postImgs.length} 张图)`,
+        onClick: () => {
+          togglePostComfyPick(allPicked ? false : true);
+          showToast(allPicked ? "已从批处理列表移除整条作品" : `已将 ${postImgs.length} 张图片加入批处理`);
+        },
+      });
+    }
+    if (refFile && refFile.path) {
+      items.push({ label: "打开所在文件夹", onClick: () => openFolder(folderOf(refFile.path)) });
+    }
+    if (p.files && p.files.length) {
+      if (items.length) items.push({ sep: true });
+      items.push({
+        label: `删除整条作品 (${p.files.length})`,
+        danger: true,
+        onClick: () => deletePostFiles(p),
+      });
+    }
+    if (!items.length) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    openContextMenu(ev.clientX, ev.clientY, items);
+  });
 
   const body = mk("div", "post-body");
   body.append(mk("div", "post-title", p.title));
@@ -1491,6 +1503,21 @@ function postTile(p, opts) {
   syncTilePickUI();
   tile._syncPickUI = syncTilePickUI;
 
+  function togglePostComfyPick(forceAdd) {
+    if (!postImgs.length) return false;
+    const allPicked = postImgs.every((f) => state.comfy.files.has(f.path));
+    const shouldAdd = typeof forceAdd === "boolean" ? forceAdd : !allPicked;
+    if (shouldAdd) {
+      postImgs.forEach((f) => state.comfy.files.set(f.path, { path: f.path, name: f.name, mtime: f.mtime || f.size || "" }));
+    } else {
+      postImgs.forEach((f) => state.comfy.files.delete(f.path));
+    }
+    syncTilePickUI();
+    updateComfyPickBar();
+    return true;
+  }
+  tile._pickAllForComfy = togglePostComfyPick;
+
   attachAssetDrag(tile, pickPostDragFile(p), {
     ignoreSelector: "button",
     dragImageEl: () => cover.querySelector("img"),
@@ -1505,22 +1532,33 @@ function postTile(p, opts) {
       p.comfy.push(res.file);
     },
   });
-  tile.addEventListener("click", () => {
-    if (state.comfy.pickMode) {
+  tile.addEventListener("click", (ev) => {
+    if (ev.shiftKey) {
+      ev.preventDefault();
+      const siblings = Array.from(tile.parentElement?.querySelectorAll(".post") || []);
+      const curIdx = siblings.indexOf(tile);
+      const anchorIdx = state.comfy.lastPostTile ? siblings.indexOf(state.comfy.lastPostTile) : curIdx;
+      const from = anchorIdx >= 0 ? Math.min(anchorIdx, curIdx) : curIdx;
+      const to = anchorIdx >= 0 ? Math.max(anchorIdx, curIdx) : curIdx;
+      let touched = 0;
+      for (let i = from; i <= to; i++) {
+        if (siblings[i]?._pickAllForComfy?.(true)) touched += 1;
+      }
+      if (!touched) showToast("所选范围内没有可处理的图片");
+      else if (to > from) showToast(`已将范围内 ${touched} 条作品的图片加入批处理`);
+      return;
+    }
+    if (ev.ctrlKey || ev.metaKey || state.comfy.pickMode) {
+      if (ev.ctrlKey || ev.metaKey) ev.preventDefault();
       if (!postImgs.length) {
         showToast("这条作品没有可处理的图片或截帧");
         return;
       }
-      const allPicked = postImgs.every((f) => state.comfy.files.has(f.path));
-      if (allPicked) {
-        postImgs.forEach((f) => state.comfy.files.delete(f.path));
-      } else {
-        postImgs.forEach((f) => state.comfy.files.set(f.path, { path: f.path, name: f.name, mtime: f.mtime || f.size || "" }));
-      }
-      syncTilePickUI();
-      updateComfyPickBar();
+      state.comfy.lastPostTile = tile;
+      togglePostComfyPick();
       return;
     }
+    state.comfy.lastPostTile = tile;
     openViewer(p);
   });
   tile.addEventListener("keydown", (e) => {
@@ -1564,10 +1602,76 @@ function setViewerSubMode(mode) {
     v.files = v.mainFiles;
     v.index = v.files.length ? Math.min(v.mainIndex, v.files.length - 1) : 0;
   }
+  v.pickAnchor = v.index;
   updateViewerComfyToggle();
   renderViewerThumbs();
   renderViewerFrames();
   renderViewerComfy();
+  showViewerFile();
+}
+
+function isComfySelectableFile(f) {
+  return !!(f && f.path && f.kind !== "video" && COMFY_IMG_RE.test(f.name || f.path));
+}
+
+function syncViewerThumbsPicked() {
+  const v = state.viewer;
+  const mark = (container, sel) => {
+    if (!container) return;
+    container.querySelectorAll(sel).forEach((btn) => {
+      const idx = Number(btn.dataset.idx);
+      const file = v.files[idx];
+      btn.classList.toggle("is-comfy-picked", !!(file && state.comfy.files.has(file.path)));
+    });
+  };
+  mark($("viewerThumbs"), ".viewer-thumb-btn");
+  mark($("viewerFrames"), ".viewer-frame-thumb");
+  mark($("viewerComfy"), ".viewer-comfy-thumb");
+  syncViewerComfyBtn(v.files[v.index]);
+}
+
+function handleViewerThumbClick(idx, ev) {
+  const v = state.viewer;
+  if (ev && ev.shiftKey) {
+    ev.preventDefault();
+    const anchor = Number.isInteger(v.pickAnchor) ? v.pickAnchor : v.index;
+    const from = Math.min(anchor, idx);
+    const to = Math.max(anchor, idx);
+    let added = 0;
+    for (let i = from; i <= to; i++) {
+      const file = v.files[i];
+      if (!isComfySelectableFile(file)) continue;
+      state.comfy.files.set(file.path, { path: file.path, name: file.name || file.path, mtime: file.mtime || file.size || "" });
+      added += 1;
+    }
+    v.index = idx;
+    showViewerFile();
+    syncViewerThumbsPicked();
+    updateComfyPickBar();
+    syncAllPickTiles();
+    showToast(added ? `已连选 ${added} 张图片加入批处理` : "所选范围内没有可批处理的图片");
+    return;
+  }
+  if (ev && (ev.ctrlKey || ev.metaKey)) {
+    ev.preventDefault();
+    const file = v.files[idx];
+    if (!isComfySelectableFile(file)) {
+      showToast("该文件不是可批处理的图片格式");
+      return;
+    }
+    if (state.comfy.files.has(file.path)) {
+      state.comfy.files.delete(file.path);
+    } else {
+      state.comfy.files.set(file.path, { path: file.path, name: file.name || file.path, mtime: file.mtime || file.size || "" });
+    }
+    v.pickAnchor = idx;
+    syncViewerThumbsPicked();
+    updateComfyPickBar();
+    syncAllPickTiles();
+    return;
+  }
+  v.pickAnchor = idx;
+  v.index = idx;
   showViewerFile();
 }
 
@@ -1578,6 +1682,7 @@ function openViewer(post) {
   v.comfyFiles = [...(post.comfy || [])];
   v.subMode = "main";
   v.mainIndex = 0;
+  v.pickAnchor = 0;
   v.comfyIndex = 0;
   v.files = v.mainFiles;
   v.index = 0;
@@ -1631,8 +1736,9 @@ function renderViewerThumbs() {
     const btn = mk("button", "viewer-thumb-btn");
     btn.type = "button";
     btn.dataset.idx = String(idx);
-    btn.title = `第 ${idx + 1} 个：${file.name || ""}`;
+    btn.title = `第 ${idx + 1} 个：${file.name || ""}（Ctrl+点击单选批处理，Shift+点击连选）`;
     if (idx === v.index) btn.classList.add("is-active");
+    if (state.comfy.files.has(file.path)) btn.classList.add("is-comfy-picked");
     if (file.kind === "video") {
       const box = mk("span", "viewer-thumb-video", "视频");
       btn.append(box);
@@ -1644,10 +1750,7 @@ function renderViewerThumbs() {
       btn.append(img);
     }
     btn.append(mk("span", "viewer-thumb-num", String(idx + 1)));
-    btn.addEventListener("click", () => {
-      v.index = idx;
-      showViewerFile();
-    });
+    btn.addEventListener("click", (ev) => handleViewerThumbClick(idx, ev));
     bar.append(btn);
   });
 }
@@ -1675,19 +1778,17 @@ function renderViewerFrames() {
   for (const { file, idx } of frames) {
     const btn = mk("button", "viewer-frame-thumb");
     btn.type = "button";
-    btn.title = `${file.name || "截图"}（点击查看，可直接拖出）`;
+    btn.title = `${file.name || "截图"}（点击查看，Ctrl/Shift 选入批处理，可直接拖出）`;
     btn.dataset.idx = String(idx);
     if (idx === v.index) btn.classList.add("is-active");
+    if (state.comfy.files.has(file.path)) btn.classList.add("is-comfy-picked");
     const img = document.createElement("img");
     img.src = thumbURL(file.path, 160, file.mtime || file.size || "");
     img.alt = file.name || "";
     img.draggable = false;
     btn.append(img);
     attachAssetDrag(btn, file, { dragImageEl: () => img });
-    btn.addEventListener("click", () => {
-      v.index = idx;
-      showViewerFile();
-    });
+    btn.addEventListener("click", (ev) => handleViewerThumbClick(idx, ev));
     box.append(btn);
   }
 }
@@ -1743,67 +1844,91 @@ function renderViewerComfy() {
   outputs.forEach((file, idx) => {
     const btn = mk("button", "viewer-comfy-thumb");
     btn.type = "button";
-    btn.title = `${file.name || "工作流成品"}（点击查看，可直接拖出）`;
+    btn.title = `${file.name || "工作流成品"}（点击查看，Ctrl/Shift 选入批处理，可直接拖出）`;
     btn.dataset.idx = String(idx);
     if (idx === v.index) btn.classList.add("is-active");
+    if (state.comfy.files.has(file.path)) btn.classList.add("is-comfy-picked");
     const img = document.createElement("img");
     img.src = thumbURL(file.path, 160, file.mtime || file.size || "");
     img.alt = file.name || "";
     img.draggable = false;
     btn.append(img);
     attachAssetDrag(btn, file, { dragImageEl: () => img });
-    btn.addEventListener("click", () => {
-      v.index = idx;
-      showViewerFile();
-    });
+    btn.addEventListener("click", (ev) => handleViewerThumbClick(idx, ev));
     strip.append(btn);
   });
   box.append(strip);
 }
 
-function updateViewerDeleteButtons() {
-  const v = state.viewer;
-  const f = v.files[v.index];
-  const delOne = $("viewerDeleteOne");
-  const delAll = $("viewerDelete");
-  if (!delOne || !delAll) return;
-  const n = v.files.length;
-  if (v.subMode === "comfy") {
-    if (!n) {
-      delOne.hidden = true;
-      delAll.hidden = true;
+async function deletePostFiles(p, triggerBtn) {
+  if (!p || !p.files || !p.files.length) return;
+  const n = p.files.length;
+  const label = p.title ? `「${p.title}」` : "这条作品";
+  if (!window.confirm(`把${label}（${n} 个文件）移到回收站？`)) return;
+  if (triggerBtn) triggerBtn.disabled = true;
+  try {
+    const delPaths = p.files.map((f) => f.path);
+    const r = await api("/api/post/delete", { paths: delPaths });
+    if (!r.ok) {
+      showToast(r.message || "删除失败");
       return;
     }
-    delAll.hidden = false;
-    if (n > 1 && f) {
-      delOne.hidden = false;
-      delOne.textContent = "删这张成品";
-      delAll.textContent = `清空成品 (${n})`;
-      delAll.title = `把当前作品的全部 ${n} 张工作流成品移到回收站`;
-    } else {
-      delOne.hidden = true;
-      delAll.textContent = "删除这张成品";
-      delAll.title = "把这张工作流成品移到回收站";
-    }
-    return;
-  }
-  if (!n) {
-    delOne.hidden = true;
-    delAll.hidden = true;
-    return;
-  }
-  delAll.hidden = false;
-  const multi = n > 1 && !!f;
-  delOne.hidden = !multi;
-  if (multi) {
-    delOne.textContent = f.is_frame ? "删这张截图" : (f.kind === "video" ? "删当前视频" : "删这一张");
-    delAll.textContent = `删整条 (${n})`;
-    delAll.title = `把这条作品的全部 ${n} 个文件移到回收站`;
-  } else {
-    delAll.textContent = "移到回收站";
-    delAll.title = "把这条作品的文件移到回收站";
+    removeComfyPickedPaths(delPaths);
+    showToast(`已将 ${r.deleted || n} 个文件移到回收站`);
+    state.gallery.dirty = true;
+    if (state.view === "gallery") loadGallery(true);
+    if (state.view === "creator" && state.lib.key) refreshLibrary(true);
+  } catch (e) {
+    showToast("删除失败：" + e.message);
+  } finally {
+    if (triggerBtn) triggerBtn.disabled = false;
   }
 }
+
+function hideContextMenu() {
+  const menu = $("ctxMenu");
+  if (!menu) return;
+  menu.hidden = true;
+  menu.innerHTML = "";
+}
+
+function openContextMenu(x, y, items) {
+  const menu = $("ctxMenu");
+  if (!menu || !items || !items.length) return;
+  const host = $("viewer")?.open ? $("viewer") : document.body;
+  if (menu.parentElement !== host) host.append(menu);
+  menu.innerHTML = "";
+  for (const it of items) {
+    if (it.sep) {
+      menu.append(mk("div", "ctx-sep"));
+      continue;
+    }
+    const btn = mk("button", "ctx-item" + (it.danger ? " is-danger" : ""), it.label);
+    btn.type = "button";
+    btn.role = "menuitem";
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      hideContextMenu();
+      it.onClick();
+    });
+    menu.append(btn);
+  }
+  menu.hidden = false;
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+  const rect = menu.getBoundingClientRect();
+  const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+  const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+document.addEventListener("click", (ev) => {
+  const menu = $("ctxMenu");
+  if (menu && !menu.hidden && !menu.contains(ev.target)) hideContextMenu();
+});
+window.addEventListener("resize", hideContextMenu);
+window.addEventListener("scroll", hideContextMenu, true);
 
 function appendViewerFrame(r) {
   const v = state.viewer;
@@ -1819,7 +1944,6 @@ function appendViewerFrame(r) {
   $("viewerNext").hidden = v.files.length < 2;
   renderViewerThumbs();
   renderViewerFrames();
-  updateViewerDeleteButtons();
 }
 
 function clearViewerStage() {
@@ -1849,7 +1973,6 @@ function showViewerFile() {
   $("viewerPrev").hidden = v.files.length < 2;
   $("viewerNext").hidden = v.files.length < 2;
   syncViewerFramesActive();
-  updateViewerDeleteButtons();
   if (!f) {
     if (v.subMode === "comfy") {
       stage.append(mk("div", "empty", "当前作品还没有工作流成品；把图片拖到这里即可归入。"));
@@ -1909,6 +2032,7 @@ $("viewerClose").addEventListener("click", () => {
   $("viewer").close();
 });
 $("viewer").addEventListener("close", () => {
+  hideContextMenu();
   clearViewerStage();
   vfReset();
 });
@@ -1924,21 +2048,22 @@ $("viewerNext").addEventListener("click", () => {
   v.index = (v.index + 1) % v.files.length;
   showViewerFile();
 });
-$("viewerOpen").addEventListener("click", () => {
+
+function viewerOpenFolder(targetIndex) {
   const v = state.viewer;
-  const f = v.files[v.index] || v.mainFiles[v.mainIndex] || v.mainFiles[0];
+  const idx = Number.isInteger(targetIndex) ? targetIndex : v.index;
+  const f = v.files[idx] || v.mainFiles[v.mainIndex] || v.mainFiles[0];
   if (f) openFolder(folderOf(f.path));
   else showToast("没有可打开的文件夹");
-});
+}
 
-$("viewerDeleteOne").addEventListener("click", async () => {
+async function viewerDeleteSingle(targetIndex) {
   const v = state.viewer;
-  const f = v.files[v.index];
+  const idx = Number.isInteger(targetIndex) ? targetIndex : v.index;
+  const f = v.files[idx];
   if (!f) return;
   const label = f.name ? `「${f.name}」` : "当前文件";
   if (!window.confirm(`把${label}移到回收站？`)) return;
-  const btn = $("viewerDeleteOne");
-  btn.disabled = true;
   try {
     const r = await api("/api/post/delete", { paths: [f.path] });
     if (!r.ok) {
@@ -1946,7 +2071,7 @@ $("viewerDeleteOne").addEventListener("click", async () => {
       return;
     }
     removeComfyPickedPaths([f.path]);
-    v.files.splice(v.index, 1);
+    v.files.splice(idx, 1);
     if (v.post) {
       if (f.is_comfy && Array.isArray(v.post.comfy)) {
         v.post.comfy = v.post.comfy.filter((x) => x.path !== f.path);
@@ -1977,12 +2102,10 @@ $("viewerDeleteOne").addEventListener("click", async () => {
     showViewerFile();
   } catch (e) {
     showToast("删除失败：" + e.message);
-  } finally {
-    btn.disabled = false;
   }
-});
+}
 
-$("viewerDelete").addEventListener("click", async () => {
+async function viewerDeleteAll() {
   const v = state.viewer;
   if (!v.files.length) return;
   const n = v.files.length;
@@ -1993,8 +2116,6 @@ $("viewerDelete").addEventListener("click", async () => {
     ? (n === 1 ? "把这张工作流成品移到回收站？" : `清空当前作品的全部 ${n} 张工作流成品（移到回收站）？`)
     : `把${label}（${n} 个文件）移到回收站？`;
   if (!window.confirm(msg)) return;
-  const btn = $("viewerDelete");
-  btn.disabled = true;
   try {
     const r = await api("/api/post/delete", { paths: delPaths });
     if (!r.ok) {
@@ -2020,9 +2141,38 @@ $("viewerDelete").addEventListener("click", async () => {
     }
   } catch (e) {
     showToast("删除失败：" + e.message);
-  } finally {
-    btn.disabled = false;
   }
+}
+
+$("viewer").querySelector(".viewer-body")?.addEventListener("contextmenu", (ev) => {
+  const tag = (ev.target && ev.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select") return;
+  const v = state.viewer;
+  const thumbBtn = ev.target?.closest?.(".viewer-thumb-btn, .viewer-frame-thumb, .viewer-comfy-thumb");
+  const idx = thumbBtn && thumbBtn.dataset.idx !== undefined ? Number(thumbBtn.dataset.idx) : v.index;
+  const f = v.files[idx] || v.files[v.index];
+  const refFile = f || v.mainFiles[v.mainIndex] || v.mainFiles[0];
+  const items = [];
+  if (refFile && refFile.path) {
+    items.push({ label: "打开所在文件夹", onClick: () => viewerOpenFolder(idx) });
+  }
+  if (f) {
+    const singleLabel = f.is_comfy
+      ? "删除这张成品"
+      : (f.is_frame ? "删除这张截图" : (f.kind === "video" ? "删除当前视频" : "删除这一张"));
+    if (items.length) items.push({ sep: true });
+    items.push({ label: singleLabel, danger: true, onClick: () => viewerDeleteSingle(idx) });
+  }
+  if (v.files.length > 1 || (v.subMode === "main" && v.files.length === 1)) {
+    const allLabel = v.subMode === "comfy"
+      ? `清空全部成品 (${v.files.length})`
+      : (v.files.length > 1 ? `删除整条作品 (${v.files.length})` : "删除整条作品");
+    items.push({ label: allLabel, danger: true, onClick: () => viewerDeleteAll() });
+  }
+  if (!items.length) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  openContextMenu(ev.clientX, ev.clientY, items);
 });
 
 $("viewerExtract").addEventListener("click", async () => {
@@ -4608,7 +4758,7 @@ $("viewerAddComfy").addEventListener("click", () => {
     state.comfy.files.set(f.path, { path: f.path, name: f.name || f.path, mtime: f.mtime || f.size || "" });
     showToast("已加入批处理列表");
   }
-  syncViewerComfyBtn(f);
+  syncViewerThumbsPicked();
   updateComfyPickBar();
   syncAllPickTiles();
 });
@@ -4971,6 +5121,7 @@ $("comfyStartBtn").addEventListener("click", async () => {
       server: $("comfyServer").value.trim(),
       prefix: $("comfyPrefix").value.trim(),
       prompt: $("comfyPrompt").value.trim(),
+      preset_name: $("comfyPresetSelect").value.trim(),
     });
     if (!r.ok) {
       showToast(r.message || "启动失败");
